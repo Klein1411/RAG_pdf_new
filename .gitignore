@@ -1,0 +1,44 @@
+# ==================
+# Python
+# ==================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+venv/
+ENV/
+env/
+t/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Databases / Indexes
+*.sqlite3
+*.bin
+*.pickle
+
+# Large models
+models/
+
+# Logs
+*.log
+
+# VS Code
+.vscode/
+
+# where to load file test
+pdf_place/
+
+gemini_query.py
+
+.gradio/
+
+ca.pem
+certificate.pem
+
+.env
