@@ -19,16 +19,13 @@ def convert_to_markdown(pdf_path: str) -> str:
         markdown_content = f"# Nội dung từ {os.path.basename(pdf_path)}\n\n"
         
         # 3. Xử lý dữ liệu đã trích xuất và định dạng thành Markdown
-        for i, page_content in enumerate(pages_data, 1):
-            markdown_content += f"## Trang {i}\n\n"
+        for page_content in pages_data:
+            page_num = page_content["page_number"]
+            markdown_content += f"## Trang {page_num}\n\n"
             
             if page_content.get("text"):
-                markdown_content += "### Văn bản gốc:\n"
+                markdown_content += "### Nội dung trang:\n"
                 markdown_content += page_content["text"] + "\n\n"
-            
-            if page_content.get("ocr"):
-                markdown_content += "### Văn bản OCR:\n"
-                markdown_content += page_content["ocr"] + "\n\n"
 
             if page_content.get("tables"):
                 markdown_content += "### Bảng:\n"
@@ -36,7 +33,9 @@ def convert_to_markdown(pdf_path: str) -> str:
                     markdown_content += f"**Bảng {j}**\n"
                     # Biểu diễn bảng đơn giản
                     for row in table:
-                        markdown_content += "| " + " | ".join(map(str, row)) + " |\n"
+                        # Đảm bảo tất cả các ô đều là chuỗi trước khi join
+                        str_row = [str(cell) if cell is not None else '' for cell in row]
+                        markdown_content += "| " + " | ".join(str_row) + " |\n"
                     markdown_content += "\n"
 
         return markdown_content
