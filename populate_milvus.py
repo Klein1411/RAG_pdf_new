@@ -2,16 +2,8 @@ import torch
 from sentence_transformers import SentenceTransformer
 from read_pdf import extract_pdf_pages
 from milvus import get_or_create_collection
-from config import PDF_PATH
+from config import PDF_PATH, EMBEDDING_MODEL_NAME, EMBEDDING_DIM, COLLECTION_NAME
 import os
-
-# --- 1. CẤU HÌNH ---
-# Chọn model embedding. 
-# 'paraphrase-multilingual-mpnet-base-v2' là một model mạnh, đa ngôn ngữ, hỗ trợ tốt tiếng Việt.
-EMBEDDING_MODEL_NAME = 'intfloat/multilingual-e5-large-instruct'
-COLLECTION_NAME = "pdf_rag_collection"
-# Số chiều của vector embedding cho model trên là 1024
-EMBEDDING_DIM = 1024
 
 def get_embedding_model():
     """
