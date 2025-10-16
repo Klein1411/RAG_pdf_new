@@ -1,61 +1,85 @@
-# d:\Project_self\export_md.py
-# 1. Import hàm cần thiết từ file read_pdf.py của bạn
-from read_pdf import extract_pdf_pages
 import os
+from read_pdf import extract_pdf_pages
+
+def format_table_as_markdown(table: list[list[str]]) -> str:
+    """
+    Định dạng một bảng (danh sách của các danh sách) thành một bảng Markdown.
+    """
+    markdown_table = ""
+    if not table:
+        return ""
+        
+    # Tạo hàng tiêu đề
+    header = [str(cell) if cell is not None else '' for cell in table[0]]
+    markdown_table += "| " + " | ".join(header) + " |\n"
+    
+    # Tạo hàng phân cách
+    markdown_table += "| " + " | ".join(["---"] * len(header)) + " |\n"
+    
+    # Tạo các hàng nội dung
+    for row in table[1:]:
+        str_row = [str(cell) if cell is not None else '' for cell in row]
+        markdown_table += "| " + " | ".join(str_row) + " |\n"
+        
+    return markdown_table + "\n"
 
 def convert_to_markdown(pdf_path: str) -> str:
     """
-    Trích xuất nội dung từ PDF và chuyển thành định dạng Markdown đơn giản.
+    Sử dụng hàm extract_pdf_pages để lấy dữ liệu có cấu trúc và chuyển đổi
+    thành một file Markdown hoàn chỉnh, xử lý đúng theo nguồn dữ liệu.
     """
     if not os.path.exists(pdf_path):
         return f"# Lỗi\n\nKhông tìm thấy file PDF tại đường dẫn: `{pdf_path}`"
 
-    print(f"Đang xử lý file: {pdf_path}")
+    print(f"▶️  Bắt đầu quá trình tạo file Markdown cho: {pdf_path}")
     try:
-        # 2. Gọi hàm đã import để lấy nội dung PDF
         pages_data = extract_pdf_pages(pdf_path)
         
+        if not pages_data:
+            return f"# Lỗi\n\nKhông thể trích xuất bất kỳ nội dung nào từ file: `{pdf_path}`"
+
         markdown_content = f"# Nội dung từ {os.path.basename(pdf_path)}\n\n"
         
-        # 3. Xử lý dữ liệu đã trích xuất và định dạng thành Markdown
         for page_content in pages_data:
             page_num = page_content["page_number"]
-            markdown_content += f"## Trang {page_num}\n\n"
+            source = page_content["source"]
+            text = page_content["text"]
+            tables = page_content["tables"]
+
+            markdown_content += f"--- Trang {page_num} (Nguồn: {source}) ---\n\n"
             
-            if page_content.get("text"):
-                markdown_content += "### Nội dung trang:\n"
-                markdown_content += page_content["text"] + "\n\n"
+            # Nếu nguồn là Gemini, văn bản đã là Markdown.
+            if source == "gemini":
+                markdown_content += text + "\n\n"
+            # Nếu nguồn là thủ công, cần xử lý thêm
+            else:
+                if text:
+                    markdown_content += "### Nội dung trang:\n"
+                    # Bọc văn bản thô trong khối code để giữ nguyên định dạng
+                    markdown_content += f"```\n{text}\n```\n\n"
+                
+                if tables:
+                    markdown_content += "### Bảng trích xuất:\n"
+                    for j, table in enumerate(tables, 1):
+                        markdown_content += f"**Bảng {j}**\n"
+                        markdown_content += format_table_as_markdown(table)
 
-            if page_content.get("tables"):
-                markdown_content += "### Bảng:\n"
-                for j, table in enumerate(page_content["tables"], 1):
-                    markdown_content += f"**Bảng {j}**\n"
-                    # Biểu diễn bảng đơn giản
-                    for row in table:
-                        # Đảm bảo tất cả các ô đều là chuỗi trước khi join
-                        str_row = [str(cell) if cell is not None else '' for cell in row]
-                        markdown_content += "| " + " | ".join(str_row) + " |\n"
-                    markdown_content += "\n"
-
+        print("(´｡• ᵕ •｡`) Ghép nối nội dung Markdown hoàn tất.")
         return markdown_content
 
     except Exception as e:
-        return f"# Lỗi\n\nĐã có lỗi xảy ra khi xử lý file PDF: {e}"
+        return f"# Lỗi\n\nĐã có lỗi xảy ra trong quá trình tạo Markdown: {e}"
 
 if __name__ == "__main__":
-    # 4. **QUAN TRỌNG**: Lấy đường dẫn từ file config tập trung
     from config import PDF_PATH
     
-    # Lấy nội dung markdown
     markdown_output = convert_to_markdown(PDF_PATH)
     
-    # Xác định đường dẫn file markdown đầu ra
     output_filename = os.path.splitext(os.path.basename(PDF_PATH))[0] + ".md"
     output_filepath = os.path.join(os.path.dirname(PDF_PATH), output_filename)
 
-    # 5. Lưu kết quả ra file .md
-    print(f"Lưu kết quả vào file: {output_filepath}")
+    print(f"（*＾3＾)/~☆ Lưu kết quả vào file: {output_filepath}")
     with open(output_filepath, "w", encoding="utf-8") as f:
         f.write(markdown_output)
         
-    print("✅ Hoàn thành!")
+    print("*    ~    o(≧▽≦)o    ♪ Hoàn thành! File Markdown đã được tạo.")
