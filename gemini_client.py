@@ -45,6 +45,38 @@ def configure_gemini():
     print("❌ Không tìm thấy API key hoặc model nào hoạt động.")
     return None
 
+
+# Danh sách các model vision để thử
+VISION_MODELS = ["gemini-pro-vision"]
+
+def configure_gemini_vision():
+    """
+    Tự động tìm và cấu hình API key và model vision tốt nhất hoạt động.
+    Trả về model đã được khởi tạo nếu thành công, ngược lại trả về None.
+    """
+    if not API_KEYS:
+        print("⚠️ Không tìm thấy API key nào trong file .env.")
+        return None
+
+    print("🔄 Đang tìm API key và model vision phù hợp...")
+    for i, key in enumerate(API_KEYS):
+        print(f"🔑 Thử với API Key #{i + 1}...")
+        genai.configure(api_key=key)
+        
+        # Thử với các model vision
+        for model_name in VISION_MODELS:
+            try:
+                model = genai.GenerativeModel(model_name)
+                # Here we just check if model can be initialized
+                print(f"   -> ✅ Key #{i + 1} và model vision '{model_name}' đã sẵn sàng.")
+                return model
+            except Exception as e:
+                print(f"   -> ❌ Lỗi với model vision '{model_name}': {e}")
+                continue # Thử model tiếp theo
+    
+    print("❌ Không tìm thấy API key hoặc model vision nào hoạt động.")
+    return None
+
 if __name__ == "__main__":
     # Chạy cấu hình và kiểm tra
     active_model = configure_gemini()
@@ -53,3 +85,10 @@ if __name__ == "__main__":
         print(f"\n✅ Cấu hình thành công! Model '{active_model.model_name}' đang được sử dụng.")
     else:
         print("\n❌ Không thể cấu hình Gemini. Vui lòng kiểm tra lại API keys và quyền truy cập.")
+
+    # Test for vision model
+    active_vision_model = configure_gemini_vision()
+    if active_vision_model:
+        print(f"\n✅ Cấu hình vision thành công! Model '{active_vision_model.model_name}' đang được sử dụng.")
+    else:
+        print("\n❌ Không thể cấu hình Gemini Vision.")

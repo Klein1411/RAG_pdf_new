@@ -9,7 +9,7 @@ import torch
 import easyocr
 
 # Import hàm cấu hình Gemini từ client
-from gemini_client import configure_gemini
+from gemini_client import configure_gemini, configure_gemini_vision
 
 # --- SETUP ---
 logging.getLogger("pdfplumber").setLevel(logging.ERROR)
@@ -80,12 +80,30 @@ def ocr_on_page(page) -> str:
     except Exception as e:
         return f"[Lỗi khi đang chạy OCR trên trang: {e}]"
 
+def gemini_ocr_on_page(page, model) -> str:
+    """
+    Sử dụng Gemini Vision để OCR một trang duy nhất.
+    """
+    if not model:
+        return "[Lỗi Gemini: Model Vision chưa được cấu hình]"
+    try:
+        print("      -> 🧠 Gửi trang đến Gemini Vision để OCR...")
+        img = page.to_image(resolution=300).original
+        response = model.generate_content(["Trích xuất toàn bộ văn bản từ hình ảnh này.", img])
+        return response.text.strip()
+    except Exception as e:
+        print(f"      -> ❌ Lỗi khi gọi Gemini Vision cho trang: {e}")
+        return "[Lỗi Gemini: Không thể OCR trang]"
+
 # --- HÀM TRÍCH XUẤT CHÍNH (Logic kết hợp) ---
 def extract_pdf_pages(path: str) -> List[Dict]:
     print("✨ Cấu hình Gemini...")
     model = configure_gemini()
+    vision_model = configure_gemini_vision()
     if not model:
         print("   -> ⚠️ Không thể cấu hình Gemini. Sẽ tự động dùng phương án 2.")
+    if not vision_model:
+        print("   -> ⚠️ Không thể cấu hình Gemini Vision. OCR bằng Gemini sẽ không khả dụng.")
 
     # --- Hỏi người dùng lựa chọn phương án ---
     use_gemini = False
@@ -159,9 +177,14 @@ def extract_pdf_pages(path: str) -> List[Dict]:
             
             # Nếu trang có ít text và không có bảng -> khả năng là ảnh -> dùng OCR
             if len(text.strip()) < 100 and not tables:
-                print(f"      -> Trang {i} có ít văn bản, đang chạy OCR...")
-                page_data["text"] = ocr_on_page(page)
-                page_data["source"] = "ocr"
+                # Ưu tiên dùng Gemini Vision nếu có
+                if vision_model:
+                    page_data["text"] = gemini_ocr_on_page(page, vision_model)
+                    page_data["source"] = "gemini-ocr"
+                else:
+                    print(f"      -> Trang {i} có ít văn bản, đang chạy OCR (EasyOCR)...")
+                    page_data["text"] = ocr_on_page(page)
+                    page_data["source"] = "ocr"
             else:
                 page_data["text"] = text
                 page_data["tables"] = tables

@@ -22,7 +22,7 @@ def get_embedding_model():
         print("   -> Vui lòng đảm bảo bạn đã cài đặt thư viện: pip install sentence-transformers")
         return None
 
-def chunk_text(text: str, chunk_size: int = 700, chunk_overlap: int = 80):
+def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200):
     """
     Chia một đoạn văn bản dài thành các đoạn nhỏ hơn (chunks) một cách thông minh hơn.
     Nó sẽ cố gắng gộp các đoạn văn lại với nhau cho đến khi đạt chunk_size.
@@ -100,22 +100,19 @@ def populate_database():
         
         # Xử lý phần văn bản (text)
         if page.get('text'):
-            # Chỉ xử lý các trang có nội dung và không phải là ảnh scan (đã có text)
-            if page['source'] in ['gemini', 'manual']:
-                page_text = page['text']
-                chunks = chunk_text(page_text)
-                for chunk in chunks:
-                    all_chunks.append(chunk)
-                    metadata.append({
-                        "pdf_source": os.path.basename(PDF_PATH),
-                        "page": page_num
-                    })
+            # === SỬA LỖI: Xử lý text từ mọi nguồn (manual, gemini, ocr, gemini-ocr) ===
+            page_text = page['text']
+            chunks = chunk_text(page_text)
+            for chunk in chunks:
+                all_chunks.append(chunk)
+                metadata.append({
+                    "pdf_source": os.path.basename(PDF_PATH),
+                    "page": page_num
+                })
 
         # Xử lý phần bảng (tables)
         if page.get('tables'):
             for table_num, table_data in enumerate(page['tables'], 1):
-                # Chuyển bảng thành một chuỗi văn bản để embedding
-                # Cách đơn giản là nối các hàng và cột lại với nhau
                 try:
                     table_string = f"Nội dung của bảng {table_num} trên trang {page_num}:\n"
                     table_string += "\n".join([" | ".join(map(str, row)) for row in table_data])
@@ -143,17 +140,16 @@ def populate_database():
     # --- Bước 6: Chuẩn bị và lưu dữ liệu vào Milvus ---
     print("\n--- Bước 6: Lưu dữ liệu vào Milvus ---")
     entities = [
-        embeddings,                                 # Field: embedding
-        all_chunks,                                 # Field: text
-        [meta['pdf_source'] for meta in metadata],  # Field: pdf_source
-        [meta['page'] for meta in metadata]         # Field: page
+        embeddings,
+        all_chunks,
+        [meta['pdf_source'] for meta in metadata],
+        [meta['page'] for meta in metadata]
     ]
     
     try:
         insert_result = collection.insert(entities)
         print(f"   -> ✅ Chèn thành công {insert_result.insert_count} vectors vào Milvus.")
         
-        # Flush collection để đảm bảo dữ liệu được ghi xuống đĩa
         print("   -> Đang flush collection...")
         collection.flush()
         print("   -> ✅ Flush hoàn tất.")

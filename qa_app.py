@@ -26,7 +26,7 @@ def get_embedding_model():
         print(f"   -> ❌ Lỗi khi tải model embedding: {e}")
         return None
 
-def search_in_milvus(collection, query_vector, top_k=10):
+def search_in_milvus(collection, query_vector, top_k=30):
     """
     Tìm kiếm các vector tương tự trong Milvus.
     """
@@ -97,9 +97,9 @@ def main():
             
         print(f"🧠 Đang tạo embedding cho câu hỏi...")
         query_embedding = embedding_model.encode(query)
-        
-        search_results = search_in_milvus(collection, query_embedding, top_k=10)
-        
+
+        search_results = search_in_milvus(collection, query_embedding, top_k=30)
+
         if not search_results or not search_results[0]:
             print("   -> ⚠️ Không tìm thấy thông tin liên quan trong tài liệu.")
             continue
