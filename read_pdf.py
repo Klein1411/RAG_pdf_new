@@ -64,7 +64,22 @@ def extract_pdf_pages(path: str) -> List[Dict]:
     print("✨ Cấu hình Gemini...")
     model = configure_gemini()
     if not model:
-        print("   -> ⚠️ Không thể cấu hình Gemini. Sẽ chuyển sang phương án dự phòng.")
+        print("   -> ⚠️ Không thể cấu hình Gemini. Sẽ tự động dùng phương án 2.")
+
+    # --- Hỏi người dùng lựa chọn phương án ---
+    use_gemini = False
+    if model: # Chỉ hỏi nếu Gemini có sẵn
+        while True:
+            choice = input("✨ Bạn có muốn sử dụng phương án 1 (Phân tích bằng Gemini Vision)? (Y/N): ").strip().upper()
+            if choice in ['Y', 'N']:
+                break
+            print("   -> Lựa chọn không hợp lệ, vui lòng nhập Y hoặc N.")
+        
+        if choice == 'Y':
+            use_gemini = True
+            print("   -> Bạn đã chọn phương án 1 (Gemini Vision).")
+        else:
+            print("   -> Bạn đã chọn phương án 2 (Phân tích thủ công/OCR).")
 
     pages = []
     with pdfplumber.open(path) as pdf:
@@ -72,15 +87,18 @@ def extract_pdf_pages(path: str) -> List[Dict]:
             print(f"(｡◕‿◕｡) Đang phân tích trang {i}/{len(pdf.pages)}...")
             page_data = {"page_number": i, "text": "", "tables": [], "source": ""}
 
-            if model:
+            gemini_description = ""
+            # Ưu tiên 1: Thử phân tích bằng Gemini Vision (nếu được chọn)
+            if use_gemini:
                 print("   -> Thử phương án 1: Phân tích bằng Gemini Vision...")
                 img = page.to_image(resolution=300).original
                 gemini_description = describe_slide(img, model)
-            else:
-                gemini_description = "[Lỗi Gemini: Model không được cấu hình]"
-
-            if "[Lỗi Gemini" in gemini_description:
-                print("   -> (╥_╥)  Gemini không khả dụng, chuyển sang phương án 2: Phân tích thủ công...")
+            
+            # Điều kiện fallback: người dùng không chọn Gemini, hoặc Gemini có lỗi
+            if not use_gemini or "[Lỗi Gemini" in gemini_description:
+                if use_gemini: # Chỉ in thông báo lỗi nếu đã thử dùng Gemini
+                    print("   -> (╥_╥)  Gemini gặp lỗi, chuyển sang phương án 2: Phân tích thủ công...")
+                
                 page_data["source"] = "manual"
                 text = page.extract_text(layout=True) or ""
                 tables = page.extract_tables() or []
