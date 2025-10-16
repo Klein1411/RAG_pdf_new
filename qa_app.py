@@ -112,14 +112,15 @@ def main():
             context += f"- {hit.entity.get('text')}\n"
             sources.append(f"{hit.entity.get('pdf_source')} (Trang {hit.entity.get('page')})")
 
-        prompt = f'''Dựa vào các thông tin được cung cấp dưới đây từ một tài liệu PDF:
+        # # DEBUG: In ra context và sources để kiểm tra
+        # print("\n---------------- DEBUG: CONTEXT TRUY XUẤT ----------------")
+        # print("Ngữ cảnh được lấy từ Milvus:")
+        # print(context)
+        # unique_sources_for_debug = sorted(list(set(sources)))
+        # print(f"Nguồn tham khảo (trước khi đưa vào LLM): {', '.join(unique_sources_for_debug)}")
+        # print("----------------------------------------------------------\n")
 
-{context}
-
-Hãy trả lời câu hỏi sau một cách chi tiết và chính xác. Chỉ sử dụng thông tin được cung cấp, không bịa đặt. Nếu thông tin không đủ để trả lời, hãy nói rằng "Thông tin không có trong tài liệu".
-
-Câu hỏi: {query}
-'''
+        prompt = f'''Dựa vào các thông tin được cung cấp dưới đây từ một tài liệu PDF:\n\n{context}\n\nHãy trả lời câu hỏi sau một cách chi tiết và chính xác. Chỉ sử dụng thông tin được cung cấp, không bịa đặt. Nếu thông tin không đủ để trả lời, hãy nói rằng "Thông tin không có trong tài liệu".\n\nCâu hỏi: {query}\n'''
         
         # --- Gọi model với logic retry và fallback ---
         answer = generate_answer_with_fallback(prompt, model_choice, gemini_model, ollama_model_name)

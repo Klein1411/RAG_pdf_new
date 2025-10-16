@@ -11,10 +11,10 @@ PDF_PATH = "d:/Project_self/Artificial-Intelligence-A-Modern-Approach-3rd-Editio
 # Model embedding. 
 # 'paraphrase-multilingual-mpnet-base-v2' (768 dims) là một model nhẹ và nhanh.
 # 'intfloat/multilingual-e5-large-instruct' (1024 dims) là model mạnh hơn, cho kết quả tốt hơn.
-EMBEDDING_MODEL_NAME = 'intfloat/multilingual-e5-large-instruct'
+EMBEDDING_MODEL_NAME = 'paraphrase-multilingual-mpnet-base-v2'
 
 # Số chiều của vector embedding, phải tương ứng với model ở trên.
-EMBEDDING_DIM = 1024
+EMBEDDING_DIM = 768
 
 # Tên collection trong Milvus để lưu trữ các vector.
 COLLECTION_NAME = "pdf_rag_collection"

@@ -47,7 +47,7 @@ def configure_gemini():
 
 
 # Danh sách các model vision để thử
-VISION_MODELS = ["gemini-pro-vision"]
+VISION_MODELS = ["gemini-2.5-flash"]
 
 def configure_gemini_vision():
     """
@@ -68,6 +68,7 @@ def configure_gemini_vision():
             try:
                 model = genai.GenerativeModel(model_name)
                 # Here we just check if model can be initialized
+                model.generate_content("test") # Test with a simple prompt
                 print(f"   -> ✅ Key #{i + 1} và model vision '{model_name}' đã sẵn sàng.")
                 return model
             except Exception as e:
