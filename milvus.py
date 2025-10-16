@@ -84,15 +84,14 @@ def get_or_create_collection(collection_name: str, dim: int = 768, recreate: boo
     
     print(f"   -> ✅ Đã tạo collection '{collection_name}' thành công.")
     
-    # TODO: Tạo index cho collection để tìm kiếm hiệu quả
-    # print("   -> Đang tạo index cho collection...")
-    # index_params = {
-    #     "metric_type": "L2",
-    #     "index_type": "IVF_FLAT",
-    #     "params": {"nlist": 1024}
-    # }
-    # collection.create_index(field_name="embedding", index_params=index_params)
-    # print("      -> ✅ Index đã được tạo.")
+    print("   -> Đang tạo index cho collection...")
+    index_params = {
+        "metric_type": "L2",
+        "index_type": "IVF_FLAT",
+        "params": {"nlist": 1024}
+    }
+    collection.create_index(field_name="embedding", index_params=index_params)
+    print("      -> ✅ Index đã được tạo.")
 
     return collection
 

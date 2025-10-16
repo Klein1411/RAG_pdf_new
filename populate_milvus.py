@@ -22,17 +22,46 @@ def get_embedding_model():
         print("   -> Vui lòng đảm bảo bạn đã cài đặt thư viện: pip install sentence-transformers")
         return None
 
-def chunk_text(text: str, chunk_size: int = 500, chunk_overlap: int = 50):
+def chunk_text(text: str, chunk_size: int = 700, chunk_overlap: int = 80):
     """
-    Chia một đoạn văn bản dài thành các đoạn nhỏ hơn (chunks).
-    Đây là kỹ thuật quan trọng để RAG hoạt động hiệu quả.
+    Chia một đoạn văn bản dài thành các đoạn nhỏ hơn (chunks) một cách thông minh hơn.
+    Nó sẽ cố gắng gộp các đoạn văn lại với nhau cho đến khi đạt chunk_size.
     """
-    # Tách văn bản thành các câu hoặc đoạn nhỏ dựa trên dấu xuống dòng
-    paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+    if not text:
+        return []
+
+    # Sử dụng \n\n để tách các đoạn văn lớn, hoặc \n cho các dòng đơn lẻ
+    # Điều này giúp giữ các mục trong danh sách hoặc các dòng thơ gần nhau
+    paragraphs = text.split('\n')
+    
     chunks = []
+    current_chunk = ""
+    
     for p in paragraphs:
-        # Đơn giản là chia theo từng đoạn, có thể cải tiến thêm sau
-        chunks.append(p)
+        p_stripped = p.strip()
+        if not p_stripped:
+            continue
+
+        # Nếu thêm đoạn này vào sẽ vượt quá kích thước chunk
+        if len(current_chunk) + len(p_stripped) + 1 > chunk_size:
+            # Nếu current_chunk có nội dung, lưu nó lại
+            if current_chunk:
+                chunks.append(current_chunk)
+            # Bắt đầu một chunk mới với đoạn hiện tại
+            current_chunk = p_stripped
+        # Nếu không, tiếp tục thêm vào chunk hiện tại
+        else:
+            if current_chunk: # Thêm dấu cách nếu chunk đã có nội dung
+                current_chunk += "\n" + p_stripped
+            else: # Nếu là phần đầu tiên của chunk
+                current_chunk = p_stripped
+
+    # Đừng quên thêm chunk cuối cùng vào danh sách
+    if current_chunk:
+        chunks.append(current_chunk)
+    
+    # Logic cho phần overlap - hiện tại chưa implement để giữ cho nó đơn giản
+    # nhưng cấu trúc này sẵn sàng để thêm vào sau.
     return chunks
 
 
