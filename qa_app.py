@@ -98,7 +98,7 @@ def main():
         print(f"🧠 Đang tạo embedding cho câu hỏi...")
         query_embedding = embedding_model.encode(query)
 
-        search_results = search_in_milvus(collection, query_embedding, top_k=30)
+        search_results = search_in_milvus(collection, query_embedding, top_k=15)
 
         if not search_results or not search_results[0]:
             print("   -> ⚠️ Không tìm thấy thông tin liên quan trong tài liệu.")
@@ -112,7 +112,7 @@ def main():
             context += f"- {hit.entity.get('text')}\n"
             sources.append(f"{hit.entity.get('pdf_source')} (Trang {hit.entity.get('page')})")
 
-        # # DEBUG: In ra context và sources để kiểm tra
+        # DEBUG: In ra context và sources để kiểm tra
         # print("\n---------------- DEBUG: CONTEXT TRUY XUẤT ----------------")
         # print("Ngữ cảnh được lấy từ Milvus:")
         # print(context)
