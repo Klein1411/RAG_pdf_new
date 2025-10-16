@@ -1,53 +1,55 @@
 import os
-# Tắt log chi tiết của gRPC, vốn gây ra thông báo "ALTS creds ignored"
-os.environ['GRPC_VERBOSITY'] = 'ERROR'
-
 import dotenv
 import google.generativeai as genai
-from PIL import Image
 
-# Tải các biến môi trường từ file .env
+# Tải các biến môi trường
 dotenv.load_dotenv()
 
-# Đọc tất cả các API key có sẵn theo định dạng GEMINI_API_KEY_1, GEMINI_API_KEY_2, ...
+# Lấy danh sách API keys từ .env
 API_KEYS = [key for key in [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 4)] if key]
 
-if not API_KEYS:
-    print("⚠️ Không tìm thấy key Gemini nào theo định dạng GEMINI_API_KEY_1, ... trong file .env.")
+# Danh sách các model để thử
+GENERATIVE_MODELS = ["gemini-2.5-flash",
+                     "gemini-2.0-flash",
+                     "gemini-1.5-flash"]
 
-# Bạn có thể thay đổi tên model ở đây nếu cần. Model 'gemini-2.5-flash' chưa tồn tại, sử dụng 'gemini-1.5-flash'.
-MODEL_NAME = "gemini-2.5-flash"
-
-def describe_slide(img: Image.Image) -> str:
+def configure_gemini():
     """
-    Sử dụng Gemini để mô tả hình ảnh của một slide, với cơ chế tự động xoay vòng API key khi gặp lỗi.
+    Tự động tìm và cấu hình API key và model generative tốt nhất hoạt động.
+    Trả về model đã được khởi tạo nếu thành công, ngược lại trả về None.
     """
     if not API_KEYS:
-        return "[Chức năng mô tả ảnh bị tắt do thiếu API Keys]"
+        print("⚠️ Không tìm thấy API key nào trong file .env.")
+        return None
 
-    # Lặp qua từng key để thử
+    print("🔄 Đang tìm API key và model phù hợp...")
     for i, key in enumerate(API_KEYS):
-        try:
-            print(f"🔑 Thử với API Key #{i + 1}...")
-            genai.configure(api_key=key)
-            model = genai.GenerativeModel(MODEL_NAME)
-            
-            prompt = '''Bạn là một chuyên gia phân tích tài liệu và slide thuyết trình.
-Nhiệm vụ của bạn là xem hình ảnh của một slide và chuyển đổi nó thành một văn bản Markdown chi tiết, có cấu trúc.
-- Giữ lại các tiêu đề, đề mục.
-- Chuyển đổi các danh sách (bullet points) thành danh sách Markdown.
-- Trích xuất và tái tạo lại các bảng biểu một cách chính xác nhất có thể ở định dạng Markdown table.
-- Diễn giải và tóm tắt nội dung chính của slide một cách mạch lạc.
-- Luôn trả lời bằng ngôn ngữ gốc của văn bản.'''
-            
-            response = model.generate_content([prompt, img])
-            print(f"   -> ✅ Key #{i + 1} thành công!")
-            return response.text.strip()
+        print(f"🔑 Thử với API Key #{i + 1}...")
+        genai.configure(api_key=key)
         
-        except Exception as e:
-            print(f"   -> ❌ Lỗi với Key #{i + 1}: {e}")
-            # Nếu là key cuối cùng mà vẫn lỗi, vòng lặp sẽ kết thúc
-            continue
+        # Thử với các model generative
+        for model_name in GENERATIVE_MODELS:
+            try:
+                model = genai.GenerativeModel(model_name)
+                model.generate_content("test")
+                print(f"   -> ✅ Key #{i + 1} và model '{model_name}' đã sẵn sàng.")
+                # Trả về model đầu tiên hoạt động
+                return model
+            except Exception as e:
+                # In lỗi ra để người dùng biết chi tiết
+                # print(f"   -> ❌ Lỗi với model '{model_name}': {e}")
+                # Chỉ thông báo model không hoạt động cho gọn
+                print(f"   -> ❌ Model '{model_name}' không hoạt động với key này.")
+                continue # Thử model tiếp theo
     
-    # Trả về thông báo lỗi chung nếu tất cả các key đều thất bại
-    return "[Tất cả các API key đều gặp lỗi. Vui lòng kiểm tra lại.]"
+    print("❌ Không tìm thấy API key hoặc model nào hoạt động.")
+    return None
+
+if __name__ == "__main__":
+    # Chạy cấu hình và kiểm tra
+    active_model = configure_gemini()
+    
+    if active_model:
+        print(f"\n✅ Cấu hình thành công! Model '{active_model.model_name}' đang được sử dụng.")
+    else:
+        print("\n❌ Không thể cấu hình Gemini. Vui lòng kiểm tra lại API keys và quyền truy cập.")

@@ -9,13 +9,37 @@ import numpy as np
 import torch
 import easyocr
 
-# Import hàm xử lý Gemini từ file client mới
-from gemini_client import describe_slide
+# Import hàm cấu hình Gemini từ client
+from gemini_client import configure_gemini
 
 # --- SETUP ---
 # Tắt bớt warning không cần thiết
 logging.getLogger("pdfplumber").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
+
+# --- HÀM XỬ LÝ VỚI GEMINI ---
+def describe_slide(img: Image.Image, model) -> str:
+    """
+    Sử dụng model Gemini đã được cấu hình để mô tả hình ảnh của một slide.
+    """
+    if not model:
+        return "[Lỗi Gemini: Model chưa được cấu hình]"
+    
+    try:
+        prompt = '''Bạn là một chuyên gia phân tích tài liệu, slide thuyết trình, bài viết báo cáo.
+Nhiệm vụ của bạn là xem hình ảnh của một slide và chuyển đổi nó thành một văn bản Markdown chi tiết, có cấu trúc.
+- Giữ lại các tiêu đề, đề mục.
+- Chuyển đổi các danh sách (bullet points) thành danh sách Markdown.
+- Trích xuất và tái tạo lại các bảng biểu một cách chính xác nhất có thể ở định dạng Markdown table.
+- Diễn giải và tóm tắt nội dung chính của slide một cách mạch lạc.
+- Luôn trả lời bằng ngôn ngữ gốc của văn bản.'''
+        
+        response = model.generate_content([prompt, img])
+        return response.text.strip()
+    except Exception as e:
+        print(f"      -> ❌ Lỗi khi gọi Gemini Vision: {e}")
+        return "[Lỗi Gemini: Không thể phân tích ảnh]"
+
 
 # --- PHƯƠNG ÁN DỰ PHÒNG: OCR ---
 
@@ -51,18 +75,28 @@ def ocr_on_page(page) -> str:
 
 # --- HÀM TRÍCH XUẤT CHÍNH (Logic kết hợp) ---
 def extract_pdf_pages(path: str) -> List[Dict]:
+    
+    # --- Bước 1: Cấu hình và lấy model Gemini ---
+    print("✨ Cấu hình Gemini...")
+    model = configure_gemini()
+    if not model:
+        print("   -> ⚠️ Không thể cấu hình Gemini. Sẽ chuyển sang phương án dự phòng.")
+
     pages = []
     with pdfplumber.open(path) as pdf:
         for i, page in enumerate(pdf.pages, 1):
             print(f"📄 Đang phân tích trang {i}/{len(pdf.pages)}...")
             
-            # --- Ưu tiên 1: Thử phân tích bằng Gemini Vision ---
-            print("   -> Thử phương án 1: Phân tích bằng Gemini Vision...")
-            img = page.to_image(resolution=300).original
-            gemini_description = describe_slide(img)
+            gemini_description = ""
+            # --- Ưu tiên 1: Thử phân tích bằng Gemini Vision (nếu model có sẵn) ---
+            if model:
+                print("   -> Thử phương án 1: Phân tích bằng Gemini Vision...")
+                img = page.to_image(resolution=300).original
+                gemini_description = describe_slide(img, model)
 
             # --- Kiểm tra và chuyển sang phương án 2 nếu cần ---
-            if "[Tất cả các API key đều gặp lỗi" in gemini_description:
+            # Điều kiện fallback: model không có hoặc trả về lỗi
+            if not model or "[Lỗi Gemini" in gemini_description:
                 print("   -> ⚠️ Gemini không khả dụng, chuyển sang phương án 2: Phân tích thủ công...")
                 
                 # Dùng pdfplumber để trích xuất văn bản
@@ -76,6 +110,7 @@ def extract_pdf_pages(path: str) -> List[Dict]:
                     final_text = text
             else:
                 # Nếu Gemini hoạt động, sử dụng mô tả của nó
+                print("      -> ✅ Gemini phân tích thành công!")
                 final_text = gemini_description
 
             pages.append({
@@ -86,23 +121,26 @@ def extract_pdf_pages(path: str) -> List[Dict]:
 
 # --- MAIN SCRIPT EXECUTION ---
 def main():
-    parser = argparse.ArgumentParser(description="Trích xuất nội dung từ file PDF bằng Gemini Vision với phương án dự phòng thủ công.")
-    parser.add_argument("pdf_path", help="Đường dẫn đến file PDF cần xử lý.")
-    args = parser.parse_args()
-    pdf_path = args.pdf_path
-    if not os.path.exists(pdf_path):
-        print(f"Lỗi: Không tìm thấy file `{pdf_path}`")
+    # Import cấu hình đường dẫn từ file config.py
+    from config import PDF_PATH
+
+    if not os.path.exists(PDF_PATH):
+        print(f"Lỗi: Không tìm thấy file PDF tại đường dẫn trong config.py: `{PDF_PATH}`")
         return
+    
     try:
-        print(f"🚀 Bắt đầu xử lý file: {pdf_path}...")
-        extracted_pages = extract_pdf_pages(pdf_path)
-        print(f"✅ Hoàn thành! Trích xuất được {len(extracted_pages)} trang.\n")
+        print(f"🚀 Bắt đầu xử lý file: {PDF_PATH}...")
+        extracted_pages = extract_pdf_pages(PDF_PATH)
+        print(f"\n✅ Hoàn thành! Trích xuất được {len(extracted_pages)} trang.\n")
+        
+        # In preview trang đầu tiên nếu có
         if extracted_pages:
             p1 = extracted_pages[0]
             print("--- PREVIEW TRANG 1 ---")
             print(f"{p1['text'][:1000]}...")
+            
     except Exception as e:
-        print(f"Đã xảy ra lỗi không mong muốn: {e}")
+        print(f"\nĐã xảy ra lỗi không mong muốn: {e}")
 
 if __name__ == "__main__":
     main()

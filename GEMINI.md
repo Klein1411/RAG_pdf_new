@@ -15,15 +15,18 @@ This file (GEMINI.md) provides specific instructions and context for the Gemini 
     *   ["Follow the existing coding style."]
     *   ["Using milvus for vector database, using transformer local for model embeddings (must can vector the picture)"]
     *   ["use gemini api for call llm"]
+    *   ["almost use is langchain/langgraph framework"]  
 *   **Don'ts:**
     *   ["Do not commit directly to the `main` branch."]
 
 ## Key Files
 
-*   `read_pdf.py`: [this file is for read pdf input]
+*   `read_pdf.py`: [this file is for read pdf input using gemini model to read, and have case to use the normal read pdf as contingency plan]
 *   `milvus_connect.ipynb`: [this file is for the milvus database, import pdf from read_pdf.py then vector it.]
 *   `metric.pdf`: [the example pdf, change later]
-
+*   `export_md`: [this file to export the pdf into markdown file]
+*   `config`: [where to place the path for other file use]
+*   `gemini_client`: [the file to load api key from .env file, setup model and call api all in here]
 ---
 
 ### Giải thích bằng tiếng Việt

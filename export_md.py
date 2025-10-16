@@ -1,5 +1,4 @@
 # d:\Project_self\export_md.py
-
 # 1. Import hàm cần thiết từ file read_pdf.py của bạn
 from read_pdf import extract_pdf_pages
 import os
@@ -44,15 +43,15 @@ def convert_to_markdown(pdf_path: str) -> str:
         return f"# Lỗi\n\nĐã có lỗi xảy ra khi xử lý file PDF: {e}"
 
 if __name__ == "__main__":
-    # 4. **QUAN TRỌNG**: Đặt đường dẫn đến file PDF của bạn ở đây
-    PDF_FILE_PATH = "d:\\Project_self\\metric.pdf"
+    # 4. **QUAN TRỌNG**: Lấy đường dẫn từ file config tập trung
+    from config import PDF_PATH
     
     # Lấy nội dung markdown
-    markdown_output = convert_to_markdown(PDF_FILE_PATH)
+    markdown_output = convert_to_markdown(PDF_PATH)
     
     # Xác định đường dẫn file markdown đầu ra
-    output_filename = os.path.splitext(os.path.basename(PDF_FILE_PATH))[0] + ".md"
-    output_filepath = os.path.join(os.path.dirname(PDF_FILE_PATH), output_filename)
+    output_filename = os.path.splitext(os.path.basename(PDF_PATH))[0] + ".md"
+    output_filepath = os.path.join(os.path.dirname(PDF_PATH), output_filename)
 
     # 5. Lưu kết quả ra file .md
     print(f"Lưu kết quả vào file: {output_filepath}")
