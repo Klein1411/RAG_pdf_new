@@ -68,8 +68,9 @@ def get_or_create_collection(collection_name: str, dim: int = 768, recreate: boo
     fields = [
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
         FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
-        FieldSchema(name="source_text", dtype=DataType.VARCHAR, max_length=65535), # Thêm trường để lưu text gốc
-        FieldSchema(name="pdf_source", dtype=DataType.VARCHAR, max_length=1024) # Thêm trường để lưu file PDF nguồn
+        FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535, description="Nội dung của đoạn văn bản"),
+        FieldSchema(name="pdf_source", dtype=DataType.VARCHAR, max_length=1024, description="Tên file PDF nguồn"),
+        FieldSchema(name="page", dtype=DataType.INT64, description="Số trang trong file PDF")
     ]
     schema = CollectionSchema(fields, description=f"Embeddings for {collection_name}")
 

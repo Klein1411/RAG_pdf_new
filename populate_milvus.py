@@ -8,10 +8,10 @@ import os
 # --- 1. CẤU HÌNH ---
 # Chọn model embedding. 
 # 'paraphrase-multilingual-mpnet-base-v2' là một model mạnh, đa ngôn ngữ, hỗ trợ tốt tiếng Việt.
-EMBEDDING_MODEL_NAME = 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2'
+EMBEDDING_MODEL_NAME = 'intfloat/multilingual-e5-large-instruct'
 COLLECTION_NAME = "pdf_rag_collection"
-# Số chiều của vector embedding cho model trên là 768
-EMBEDDING_DIM = 768
+# Số chiều của vector embedding cho model trên là 1024
+EMBEDDING_DIM = 1024
 
 def get_embedding_model():
     """
@@ -122,9 +122,10 @@ def populate_database():
     # --- Bước 6: Chuẩn bị và lưu dữ liệu vào Milvus ---
     print("\n--- Bước 6: Lưu dữ liệu vào Milvus ---")
     entities = [
-        embeddings,
-        all_chunks, # Lưu text gốc của chunk hoặc bảng
-        [meta['pdf_source'] for meta in metadata] # Lưu file nguồn
+        embeddings,                                 # Field: embedding
+        all_chunks,                                 # Field: text
+        [meta['pdf_source'] for meta in metadata],  # Field: pdf_source
+        [meta['page'] for meta in metadata]         # Field: page
     ]
     
     try:
