@@ -406,32 +406,76 @@ class CollectionManager:
         
         try:
             # Import necessary modules
-            from src.read_pdf import extract_pdf_pages
             from src.populate_milvus import get_embedding_model, chunk_text
+            from pathlib import Path
             
             # Get collection
             collection = Collection(collection_name)
             
-            # Extract text from PDF
-            pages_data = extract_pdf_pages(pdf_path)
+            # ĐỌC TỪ FILE MD thay vì extract từ PDF
+            # Tìm file MD tương ứng trong thư mục OUTPUT_DIR
+            from src.config import OUTPUT_DIR
+            md_filename = pdf_path_obj.stem + '.md'  # Tên file không có .pdf
+            md_path = Path(OUTPUT_DIR) / md_filename
             
-            if not pages_data:
-                logger.warning(f"⚠️ Không extract được text từ {pdf_name}")
+            if not md_path.exists():
+                logger.error(f"❌ Không tìm thấy file MD: {md_path}")
+                logger.info(f"💡 Chạy 'export' để tạo file MD từ PDF trước")
+                return (collection_name, False)
+            
+            logger.info(f"📄 Đọc từ file MD: {md_path}")
+            
+            # Đọc nội dung MD
+            try:
+                md_content = md_path.read_text(encoding='utf-8')
+            except Exception as e:
+                logger.error(f"❌ Lỗi đọc file MD: {e}")
+                return (collection_name, False)
+            
+            if not md_content or not md_content.strip():
+                logger.warning(f"⚠️ File MD rỗng: {md_path}")
                 return (collection_name, False)
             
             # Get embedding model
             embedding_model = get_embedding_model()
+            
+            # PHÂN TÍCH FILE MD THÀNH CÁC TRANG
+            # File MD có format: "--- Trang X (Nguồn: ...) ---" để đánh dấu từng trang
+            import re
+            pages_dict = {}
+            current_page = 1
+            current_content = []
+            
+            for line in md_content.split('\n'):
+                # Kiểm tra marker trang: "--- Trang 3 (Nguồn: gemini) ---"
+                match = re.match(r'^---\s*Trang\s+(\d+)', line)
+                if match:
+                    # Lưu nội dung trang trước
+                    if current_content:
+                        pages_dict[current_page] = '\n'.join(current_content)
+                        current_content = []
+                    # Lấy số trang mới
+                    current_page = int(match.group(1))
+                else:
+                    current_content.append(line)
+            
+            # Lưu trang cuối
+            if current_content:
+                pages_dict[current_page] = '\n'.join(current_content)
+            
+            # Nếu không có page markers, coi toàn bộ là page 1
+            if not pages_dict:
+                pages_dict[1] = md_content
+            
+            logger.info(f"📖 Tìm thấy {len(pages_dict)} trang trong file MD")
             
             # Prepare data
             all_texts = []
             all_pages = []
             all_sources = []
             
-            for page_data in pages_data:
-                # Xử lý cả 'page' và 'page_number' để tương thích
-                page_num = page_data.get('page_number') or page_data.get('page', 1)
-                text = page_data.get('text', '')
-                
+            # Chunk từng trang
+            for page_num, text in pages_dict.items():
                 if not text or not text.strip():
                     continue
                 
@@ -439,9 +483,10 @@ class CollectionManager:
                 chunks = chunk_text(text)
                 
                 for chunk in chunks:
-                    all_texts.append(chunk)
-                    all_pages.append(page_num)
-                    all_sources.append(pdf_name)
+                    if chunk.strip():  # Chỉ thêm chunk không rỗng
+                        all_texts.append(chunk)
+                        all_pages.append(page_num)
+                        all_sources.append(pdf_name)
             
             if not all_texts:
                 logger.warning(f"⚠️ Không có text để index từ {pdf_name}")

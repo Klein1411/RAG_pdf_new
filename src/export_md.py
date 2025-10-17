@@ -96,7 +96,27 @@ def convert_to_markdown(pdf_path: str) -> str:
         
         if not pages_data:
             logger.warning(f"Không thể trích xuất nội dung từ {pdf_path}")
-            return f"# Lỗi\n\nKhông thể trích xuất bất kỳ nội dung nào từ file: `{pdf_path}`"
+            
+            # Thông báo chi tiết cho user
+            error_msg = f"""# Lỗi: Không thể trích xuất nội dung
+
+## File PDF: `{pdf_path}`
+
+### Nguyên nhân có thể:
+1. **PDF dạng ảnh (Image-based PDF)**: PDF được scan từ sách giấy, không có text layer
+   - Cần dùng **Gemini Vision** (chọn Y khi được hỏi) để OCR toàn bộ PDF
+   - Hoặc dùng công cụ OCR khác
+
+2. **PDF bị corrupt**: File bị hỏng hoặc không đúng format
+
+3. **PDF bị mã hóa/bảo vệ**: File có password hoặc bị protect
+
+### Giải pháp:
+- Chạy lại và chọn **Y** (Gemini Vision) khi được hỏi
+- Hoặc convert PDF sang version mới hơn
+- Hoặc dùng công cụ OCR riêng để tạo PDF có text layer
+"""
+            return error_msg
 
         markdown_content = f"# Nội dung từ {os.path.basename(pdf_path)}\n\n"
         

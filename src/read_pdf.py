@@ -9,6 +9,9 @@ from PIL import Image
 import numpy as np
 import torch
 import easyocr
+import fitz  # pymupdf
+import pytesseract
+import io
 
 # Thêm thư mục gốc project vào sys.path để import src module
 project_root = Path(__file__).parent.parent
@@ -106,6 +109,79 @@ def gemini_ocr_on_page(page, vision_client: GeminiClient) -> str:
         logger.error(f"❌ Lỗi khi gọi Gemini Vision cho trang: {e}")
         return "[Lỗi Gemini: Không thể OCR trang]"
 
+def tesseract_ocr_on_page(page_image: Image.Image) -> str:
+    """
+    Sử dụng Tesseract OCR để đọc text từ một trang PDF (dạng ảnh).
+    
+    Args:
+        page_image: PIL Image của trang PDF
+        
+    Returns:
+        Text đã OCR
+    """
+    try:
+        logger.debug("🔍 Đang OCR trang bằng Tesseract...")
+        text = pytesseract.image_to_string(page_image, lang='eng')
+        return text
+    except Exception as e:
+        logger.error(f"❌ Lỗi Tesseract OCR: {e}")
+        return "[Lỗi Tesseract: Không thể OCR trang]"
+
+def extract_pdf_with_tesseract(pdf_path: str) -> List[Dict]:
+    """
+    Extract toàn bộ PDF bằng pymupdf + Tesseract OCR.
+    Dùng cho image-based PDF mà pdfplumber không đọc được.
+    
+    Args:
+        pdf_path: Đường dẫn đến file PDF
+        
+    Returns:
+        List các trang với text đã OCR
+    """
+    logger.info("🔄 Chuyển sang phương án Tesseract OCR (pymupdf + Tesseract)")
+    
+    try:
+        doc = fitz.open(pdf_path)
+        total_pages = len(doc)
+        logger.info(f"📄 PDF có {total_pages} trang, đang OCR...")
+        
+        pages = []
+        
+        for page_num in range(total_pages):
+            logger.info(f"   OCR trang {page_num + 1}/{total_pages}...")
+            
+            page = doc[page_num]
+            
+            # Convert page to image (300 DPI cho OCR tốt)
+            pix = page.get_pixmap(dpi=300)
+            img_bytes = pix.tobytes("png")
+            image = Image.open(io.BytesIO(img_bytes))
+            
+            # OCR
+            text = tesseract_ocr_on_page(image)
+            
+            # Clean text
+            text = clean_extracted_text(text)
+            
+            # Tạo page data
+            page_data = {
+                "page_number": page_num + 1,
+                "text": text,
+                "tables": [],  # Tesseract không extract table
+                "source": "tesseract-ocr"
+            }
+            
+            pages.append(page_data)
+        
+        doc.close()
+        
+        logger.info(f"✅ Hoàn thành OCR {total_pages} trang bằng Tesseract")
+        return pages
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi OCR bằng Tesseract: {e}")
+        return []
+
 # --- HÀM TRÍCH XUẤT CHÍNH (Logic kết hợp) ---
 def extract_pdf_pages(path: str) -> List[Dict]:
     logger.info("✨ Cấu hình Gemini...")
@@ -141,9 +217,42 @@ def extract_pdf_pages(path: str) -> List[Dict]:
             print("   -> Bạn đã chọn phương án 2 (Phân tích thủ công/OCR).")
 
     pages = []
-    with pdfplumber.open(path) as pdf:
-        # --- PHƯƠNG ÁN 1: DÙNG GEMINI (BULK) ---
-        if use_gemini and gemini_client:
+    
+    # Thử mở bằng pdfplumber trước
+    try:
+        pdf = pdfplumber.open(path)
+        has_pages = pdf.pages and len(pdf.pages) > 0
+    except Exception as e:
+        logger.error(f"❌ Không thể mở PDF bằng pdfplumber: {e}")
+        has_pages = False
+        pdf = None
+    
+    # Kiểm tra nếu PDF không có pages (image-based PDF hoặc corrupt)
+    if not has_pages:
+        logger.error("❌ pdfplumber không đọc được cấu trúc PDF (có thể là image-based PDF)")
+        
+        # Đếm số trang bằng PyPDF2
+        try:
+            import PyPDF2
+            with open(path, 'rb') as f:
+                reader = PyPDF2.PdfReader(f)
+                num_pages = len(reader.pages)
+                logger.warning(f"⚠️ PDF có {num_pages} trang nhưng là IMAGE-BASED")
+        except:
+            num_pages = "unknown"
+        
+        # TỰ ĐỘNG CHUYỂN SANG TESSERACT OCR
+        logger.info("🔄 Tự động chuyển sang Tesseract OCR (pymupdf + Tesseract)")
+        
+        if pdf:
+            pdf.close()
+        
+        # Gọi function Tesseract OCR
+        return extract_pdf_with_tesseract(path)
+    
+    # PDF hợp lệ, tiếp tục với pdfplumber
+    # --- PHƯƠNG ÁN 1: DÙNG GEMINI (BULK) ---
+    if use_gemini and gemini_client:
             logger.info(f"Đang chuẩn bị hình ảnh từ {len(pdf.pages)} trang cho Gemini...")
             all_page_images = [page.to_image(resolution=300).original for page in pdf.pages]
             
@@ -184,40 +293,43 @@ def extract_pdf_pages(path: str) -> List[Dict]:
                 logger.info(f"✅ Đã xử lý và lưu lại {len(pages)} trang từ kết quả của Gemini")
                 return pages # Trả về kết quả và kết thúc sớm
 
-        # --- PHƯƠNG ÁN 2: THỦ CÔNG / OCR (FALLBACK) ---
-        # Logic này sẽ chạy nếu người dùng không chọn Gemini ban đầu,
-        # hoặc nếu Gemini gặp lỗi ở bước trên.
-        logger.info("Đang phân tích từng trang theo phương án 2 (Thủ công/OCR)...")
-        for i, page in enumerate(pdf.pages, 1):
-            logger.debug(f"Đang xử lý trang {i}/{len(pdf.pages)}...")
-            page_data = {"page_number": i, "text": "", "tables": [], "source": "manual"}
-            
-            text = page.extract_text(layout=False) or ""  # layout=False để giảm khoảng trắng
-            text = clean_extracted_text(text)  # Làm sạch văn bản
-            tables = page.extract_tables() or []
-            
-            # Làm sạch bảng nếu có
-            if tables:
-                tables = [clean_table_text(table) for table in tables]
-            
-            # Nếu trang có ít text và không có bảng -> khả năng là ảnh -> dùng OCR
-            if len(text.strip()) < 100 and not tables:
-                # Ưu tiên dùng Gemini Vision nếu có
-                if vision_client:
-                    ocr_text = gemini_ocr_on_page(page, vision_client)
-                    page_data["text"] = clean_extracted_text(ocr_text)
-                    page_data["source"] = "gemini-ocr"
-                else:
-                    logger.info(f"Trang {i} có ít văn bản, đang chạy OCR (EasyOCR)...")
-                    ocr_text = ocr_on_page(page)
-                    page_data["text"] = clean_extracted_text(ocr_text)
-                    page_data["source"] = "ocr"
+    # --- PHƯƠNG ÁN 2: THỦ CÔNG / OCR (FALLBACK) ---
+    # Logic này sẽ chạy nếu người dùng không chọn Gemini ban đầu,
+    # hoặc nếu Gemini gặp lỗi ở bước trên.
+    logger.info("Đang phân tích từng trang theo phương án 2 (Thủ công/OCR)...")
+    for i, page in enumerate(pdf.pages, 1):
+        logger.debug(f"Đang xử lý trang {i}/{len(pdf.pages)}...")
+        page_data = {"page_number": i, "text": "", "tables": [], "source": "manual"}
+        
+        text = page.extract_text(layout=False) or ""  # layout=False để giảm khoảng trắng
+        text = clean_extracted_text(text)  # Làm sạch văn bản
+        tables = page.extract_tables() or []
+        
+        # Làm sạch bảng nếu có
+        if tables:
+            tables = [clean_table_text(table) for table in tables]
+        
+        # Nếu trang có ít text và không có bảng -> khả năng là ảnh -> dùng OCR
+        if len(text.strip()) < 100 and not tables:
+            # Ưu tiên dùng Gemini Vision nếu có
+            if vision_client:
+                ocr_text = gemini_ocr_on_page(page, vision_client)
+                page_data["text"] = clean_extracted_text(ocr_text)
+                page_data["source"] = "gemini-ocr"
             else:
-                page_data["text"] = text
-                page_data["tables"] = tables
-            
-            pages.append(page_data)
-            
+                logger.info(f"Trang {i} có ít văn bản, đang chạy OCR (EasyOCR)...")
+                ocr_text = ocr_on_page(page)
+                page_data["text"] = clean_extracted_text(ocr_text)
+                page_data["source"] = "ocr"
+        else:
+            page_data["text"] = text
+            page_data["tables"] = tables
+        
+        pages.append(page_data)
+    
+    # Đóng PDF
+    pdf.close()
+    
     return pages
 
 # --- MAIN SCRIPT EXECUTION ---

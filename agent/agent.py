@@ -33,6 +33,9 @@ from agent.tools.search_tool import get_search_tool
 from agent.tools.topic_tool import get_topic_tool
 from agent.tools.export_tool import get_export_tool
 
+# Import export function
+from src.export_md import convert_to_markdown
+
 from src.logging_config import get_logger
 
 logger = get_logger(__name__)
