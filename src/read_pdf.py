@@ -18,6 +18,7 @@ if str(project_root) not in sys.path:
 # Import class GeminiClient
 from src.gemini_client import GeminiClient
 from src.logging_config import get_logger
+from src.clean_pdf import clean_extracted_text, clean_table_text
 
 # --- SETUP ---
 logger = get_logger(__name__)
@@ -191,18 +192,25 @@ def extract_pdf_pages(path: str) -> List[Dict]:
             logger.debug(f"Đang xử lý trang {i}/{len(pdf.pages)}...")
             page_data = {"page_number": i, "text": "", "tables": [], "source": "manual"}
             
-            text = page.extract_text(layout=True) or ""
+            text = page.extract_text(layout=False) or ""  # layout=False để giảm khoảng trắng
+            text = clean_extracted_text(text)  # Làm sạch văn bản
             tables = page.extract_tables() or []
+            
+            # Làm sạch bảng nếu có
+            if tables:
+                tables = [clean_table_text(table) for table in tables]
             
             # Nếu trang có ít text và không có bảng -> khả năng là ảnh -> dùng OCR
             if len(text.strip()) < 100 and not tables:
                 # Ưu tiên dùng Gemini Vision nếu có
                 if vision_client:
-                    page_data["text"] = gemini_ocr_on_page(page, vision_client)
+                    ocr_text = gemini_ocr_on_page(page, vision_client)
+                    page_data["text"] = clean_extracted_text(ocr_text)
                     page_data["source"] = "gemini-ocr"
                 else:
                     logger.info(f"Trang {i} có ít văn bản, đang chạy OCR (EasyOCR)...")
-                    page_data["text"] = ocr_on_page(page)
+                    ocr_text = ocr_on_page(page)
+                    page_data["text"] = clean_extracted_text(ocr_text)
                     page_data["source"] = "ocr"
             else:
                 page_data["text"] = text
