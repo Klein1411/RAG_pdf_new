@@ -9,8 +9,40 @@ if str(project_root) not in sys.path:
 
 from src.read_pdf import extract_pdf_pages
 from src.logging_config import get_logger
+from src.clean_pdf import clean_extracted_text
 
 logger = get_logger(__name__)
+
+
+def is_valid_table(table: list[list[str]]) -> bool:
+    """
+    Kiểm tra xem bảng có hợp lệ không.
+    
+    Bảng hợp lệ nếu:
+    - Có ít nhất 2 hàng
+    - Có ít nhất 2 cột
+    - Không phải toàn bộ cells đều rỗng
+    """
+    if not table or len(table) < 2:
+        return False
+    
+    # Kiểm tra số cột
+    num_cols = len(table[0]) if table else 0
+    if num_cols < 2:
+        return False
+    
+    # Kiểm tra có ít nhất 1 cell có nội dung
+    has_content = False
+    for row in table:
+        for cell in row:
+            if cell and str(cell).strip():
+                has_content = True
+                break
+        if has_content:
+            break
+    
+    return has_content
+
 
 def format_table_as_markdown(table: list[list[str]]) -> str:
     """
@@ -19,18 +51,27 @@ def format_table_as_markdown(table: list[list[str]]) -> str:
     markdown_table = ""
     if not table:
         return ""
-        
+    
+    # Đảm bảo tất cả hàng có cùng số cột
+    max_cols = max(len(row) for row in table)
+    normalized_table = []
+    for row in table:
+        # Pad thêm cells rỗng nếu thiếu
+        normalized_row = row + [''] * (max_cols - len(row))
+        # Clean và trim mỗi cell
+        normalized_row = [str(cell).strip() if cell else '' for cell in normalized_row]
+        normalized_table.append(normalized_row)
+    
     # Tạo hàng tiêu đề
-    header = [str(cell) if cell is not None else '' for cell in table[0]]
+    header = normalized_table[0]
     markdown_table += "| " + " | ".join(header) + " |\n"
     
     # Tạo hàng phân cách
     markdown_table += "| " + " | ".join(["---"] * len(header)) + " |\n"
     
     # Tạo các hàng nội dung
-    for row in table[1:]:
-        str_row = [str(cell) if cell is not None else '' for cell in row]
-        markdown_table += "| " + " | ".join(str_row) + " |\n"
+    for row in normalized_table[1:]:
+        markdown_table += "| " + " | ".join(row) + " |\n"
         
     return markdown_table + "\n"
 
@@ -38,6 +79,11 @@ def convert_to_markdown(pdf_path: str) -> str:
     """
     Sử dụng hàm extract_pdf_pages để lấy dữ liệu có cấu trúc và chuyển đổi
     thành một file Markdown hoàn chỉnh, xử lý đúng theo nguồn dữ liệu.
+    
+    Cải tiến:
+    - Lọc bỏ bảng không hợp lệ (rỗng, 1 cột, v.v.)
+    - Tránh trùng lặp giữa text và table
+    - Format Markdown tốt hơn
     """
     if not os.path.exists(pdf_path):
         logger.error(f"Không tìm thấy file PDF: {pdf_path}")
@@ -67,15 +113,21 @@ def convert_to_markdown(pdf_path: str) -> str:
                 markdown_content += text + "\n\n"
             # Nếu nguồn là thủ công, cần xử lý thêm
             else:
-                if text:
-                    markdown_content += "### Nội dung trang:\n"
-                    # Bọc văn bản thô trong khối code để giữ nguyên định dạng
-                    markdown_content += f"```\n{text}\n```\n\n"
+                # Lọc bảng hợp lệ
+                valid_tables = [table for table in tables if is_valid_table(table)]
                 
-                if tables:
-                    markdown_content += "### Bảng trích xuất:\n"
-                    for j, table in enumerate(tables, 1):
-                        markdown_content += f"**Bảng {j}**\n"
+                # Chỉ hiển thị text nếu không có bảng hợp lệ hoặc text có nội dung độc lập
+                if text and (not valid_tables or len(text.strip()) > 200):
+                    markdown_content += "### Nội dung văn bản:\n\n"
+                    # Không bọc trong code block, format như Markdown bình thường
+                    markdown_content += text + "\n\n"
+                
+                # Hiển thị bảng
+                if valid_tables:
+                    markdown_content += "### Bảng:\n\n"
+                    for j, table in enumerate(valid_tables, 1):
+                        if len(valid_tables) > 1:
+                            markdown_content += f"**Bảng {j}:**\n\n"
                         markdown_content += format_table_as_markdown(table)
 
         logger.info("Ghép nối nội dung Markdown hoàn tất")
