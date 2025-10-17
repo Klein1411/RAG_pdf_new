@@ -127,10 +127,107 @@ def tesseract_ocr_on_page(page_image: Image.Image) -> str:
         logger.error(f"❌ Lỗi Tesseract OCR: {e}")
         return "[Lỗi Tesseract: Không thể OCR trang]"
 
+def count_images_in_pdf(pdf_path: str) -> int:
+    """
+    Đếm số lượng ảnh trong PDF.
+    
+    Args:
+        pdf_path: Đường dẫn đến file PDF
+        
+    Returns:
+        Số lượng ảnh trong PDF
+    """
+    try:
+        doc = fitz.open(pdf_path)
+        total_images = 0
+        
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            image_list = page.get_images(full=False)
+            total_images += len(image_list)
+        
+        doc.close()
+        logger.info(f"📊 PDF có tổng cộng {total_images} ảnh")
+        return total_images
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Không thể đếm ảnh trong PDF: {e}, mặc định = 0")
+        return 0
+
+def extract_pdf_with_gemini_ocr(pdf_path: str, gemini_client: GeminiClient) -> List[Dict]:
+    """
+    Extract toàn bộ PDF bằng Gemini OCR (cho PDF có ít ảnh).
+    
+    Args:
+        pdf_path: Đường dẫn đến file PDF
+        gemini_client: Gemini client đã khởi tạo
+        
+    Returns:
+        List các trang với text đã OCR bằng Gemini
+    """
+    logger.info("🧠 Chuyển sang phương án Gemini OCR (chất lượng cao)")
+    
+    try:
+        doc = fitz.open(pdf_path)
+        total_pages = len(doc)
+        logger.info(f"📄 PDF có {total_pages} trang, đang OCR bằng Gemini...")
+        
+        pages = []
+        
+        for page_num in range(total_pages):
+            logger.info(f"   OCR trang {page_num + 1}/{total_pages} bằng Gemini...")
+            
+            page = doc[page_num]
+            
+            # Convert page to image (300 DPI)
+            pix = page.get_pixmap(dpi=300)
+            img_bytes = pix.tobytes("png")
+            image = Image.open(io.BytesIO(img_bytes))
+            
+            # OCR bằng Gemini
+            text = gemini_ocr_on_page_from_image(image, gemini_client)
+            
+            # Clean text
+            text = clean_extracted_text(text)
+            
+            # Tạo page data
+            page_data = {
+                "page_number": page_num + 1,
+                "text": text,
+                "tables": [],
+                "source": "gemini-ocr"
+            }
+            
+            pages.append(page_data)
+        
+        doc.close()
+        
+        logger.info(f"✅ Hoàn thành OCR {total_pages} trang bằng Gemini")
+        return pages
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi OCR bằng Gemini: {e}")
+        return []
+
+def gemini_ocr_on_page_from_image(image: Image.Image, vision_client: GeminiClient) -> str:
+    """
+    Sử dụng Gemini Vision để OCR từ ảnh PIL.
+    """
+    if not vision_client:
+        return "[Lỗi Gemini: Vision client chưa được cấu hình]"
+    try:
+        logger.debug("🧠 Gửi ảnh đến Gemini Vision để OCR...")
+        prompt = "Hãy trích xuất TOÀN BỘ văn bản trong ảnh này. Giữ nguyên định dạng, bảng biểu và cấu trúc."
+        response = vision_client.generate_content([prompt, image])
+        return response if response else "[Lỗi: Gemini không trả về kết quả]"
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi gọi Gemini Vision cho ảnh: {e}")
+        return f"[Lỗi Gemini OCR: {str(e)}]"
+
 def extract_pdf_with_tesseract(pdf_path: str) -> List[Dict]:
     """
     Extract toàn bộ PDF bằng pymupdf + Tesseract OCR.
-    Dùng cho image-based PDF mà pdfplumber không đọc được.
+    Dùng cho image-based PDF có nhiều ảnh (>= 20 ảnh).
     
     Args:
         pdf_path: Đường dẫn đến file PDF
@@ -241,14 +338,22 @@ def extract_pdf_pages(path: str) -> List[Dict]:
         except:
             num_pages = "unknown"
         
-        # TỰ ĐỘNG CHUYỂN SANG TESSERACT OCR
-        logger.info("🔄 Tự động chuyển sang Tesseract OCR (pymupdf + Tesseract)")
-        
         if pdf:
             pdf.close()
         
-        # Gọi function Tesseract OCR
-        return extract_pdf_with_tesseract(path)
+        # ĐẾM SỐ ẢNH TRONG PDF ĐỂ CHỌN PHƯƠNG ÁN OCR
+        image_count = count_images_in_pdf(path)
+        
+        # PHƯƠNG ÁN 2: CHỌN OCR DỰA TRÊN SỐ LƯỢNG ẢNH
+        if image_count < 20 and gemini_client:
+            logger.info(f"� PDF có {image_count} ảnh (< 20) → Sử dụng Gemini OCR (chất lượng cao)")
+            return extract_pdf_with_gemini_ocr(path, gemini_client)
+        else:
+            if image_count >= 20:
+                logger.info(f"📊 PDF có {image_count} ảnh (>= 20) → Sử dụng Tesseract OCR (tốc độ cao)")
+            else:
+                logger.info("📊 Gemini không khả dụng → Sử dụng Tesseract OCR")
+            return extract_pdf_with_tesseract(path)
     
     # PDF hợp lệ, tiếp tục với pdfplumber
     # --- PHƯƠNG ÁN 1: DÙNG GEMINI (BULK) ---
