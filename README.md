@@ -91,6 +91,47 @@ Hệ thống Retrieval-Augmented Generation (RAG) để xử lý PDF với OCR, 
                      └─────────────────────────────────┘
 ```
 
+### 📁 Project Structure
+
+```
+RAG_pdf_new/
+├── src/                      # 📄 Core Python modules
+│   ├── __init__.py
+│   ├── config.py            # 🔧 Configuration
+│   ├── gemini_client.py     # 🤖 Gemini API client
+│   ├── read_pdf.py          # 📖 PDF extraction
+│   ├── export_md.py         # 📝 Markdown export
+│   ├── populate_milvus.py   # 📊 ETL pipeline
+│   ├── milvus.py            # 🗄️ Vector database
+│   ├── llm_handler.py       # 🧠 LLM abstraction
+│   ├── qa_app.py            # 💬 Q&A application
+│   └── logging_config.py    # 📝 Logging setup
+│
+├── tests/                    # 🧪 Test files
+│   ├── test_gemini_client.py
+│   ├── test_gemini_setup.py
+│   └── run_tests.py
+│
+├── docs/                     # 📚 Documentation
+│   ├── GETTING_STARTED.md
+│   ├── QUICK_START_GEMINI.md
+│   ├── GEMINI_MODELS.md
+│   ├── TESTING.md
+│   ├── PROJECT_STRUCTURE.md
+│   └── ...
+│
+├── data/                     # 📁 Data files
+│   ├── pdfs/                # 📄 Input PDF files
+│   └── outputs/             # 📝 Generated Markdown files
+│
+├── .env                      # 🔐 Environment variables (create this)
+├── .gitignore
+├── requirements.txt
+└── README.md
+```
+
+📖 **Chi tiết:** Xem [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) để biết thêm về chức năng từng file.
+
 ---
 
 ## ⚡ Quick Start
@@ -120,20 +161,20 @@ MILVUS_PORT=19530
 
 ### 3️⃣ Cấu hình PDF path
 
-Sửa file `config.py`:
+Đặt PDF của bạn vào folder `data/pdfs/` và sửa file `src/config.py`:
 
 ```python
-PDF_PATH = "d:/path/to/your/document.pdf"
+PDF_PATH = "data/pdfs/your_document.pdf"
 ```
 
 ### 4️⃣ Chạy pipeline
 
 ```bash
 # Bước 1: Đồng bộ PDF vào Milvus
-python populate_milvus.py
+python -m src.populate_milvus
 
 # Bước 2: Chạy Q&A app
-python qa_app.py
+python -m src.qa_app
 ```
 
 ---
@@ -232,15 +273,15 @@ MILVUS_PORT=19530
 ### 1. Trích xuất PDF và tạo Markdown
 
 ```bash
-python export_md.py
+python -m src.export_md
 ```
 
-**Output:** `document.md` (cùng thư mục với PDF)
+**Output:** `data/outputs/document.md`
 
 ### 2. Đồng bộ dữ liệu vào Milvus
 
 ```bash
-python populate_milvus.py
+python -m src.populate_milvus
 ```
 
 **Quy trình:**
@@ -252,7 +293,7 @@ python populate_milvus.py
 ### 3. Chạy Q&A Application
 
 ```bash
-python qa_app.py
+python -m src.qa_app
 ```
 
 **Tính năng:**
@@ -274,7 +315,7 @@ Nguồn tham khảo: Artificial-Intelligence.pdf (Trang 3, Trang 4)
 ### 4. Test PDF extraction
 
 ```bash
-python read_pdf.py
+python -m src.read_pdf
 ```
 
 Chọn phương án:
@@ -308,10 +349,10 @@ Request → Model 2.0 Flash (Key 1,2,3)
 ### Test Setup
 
 ```bash
-python test_gemini_setup.py
+python -m tests.test_gemini_setup
 ```
 
-**Chi tiết:** [QUICK_START_GEMINI.md](./QUICK_START_GEMINI.md)
+**Chi tiết:** [docs/QUICK_START_GEMINI.md](docs/QUICK_START_GEMINI.md)
 
 ---
 
@@ -377,10 +418,10 @@ pytest test_gemini_client.py::TestKeyRotation -v
 ### Test setup nhanh
 
 ```bash
-python test_gemini_setup.py
+python -m tests.test_gemini_setup
 ```
 
-**Chi tiết:** [TESTING.md](./TESTING.md)
+**Chi tiết:** [docs/TESTING.md](docs/TESTING.md)
 
 ---
 
@@ -388,20 +429,17 @@ python test_gemini_setup.py
 
 ### 📖 Hướng dẫn chi tiết
 
-> 🗺️ **Navigation Hub:** [DOCS_INDEX.md](./DOCS_INDEX.md) - Tìm document nhanh chóng
-
 | File | Thời gian | Mô tả |
 |------|-----------|-------|
-| [GETTING_STARTED.md](./GETTING_STARTED.md) | 5 phút | 🚀 Quick start siêu ngắn gọn |
-| [QUICK_START_GEMINI.md](./QUICK_START_GEMINI.md) | 10 phút | 🤖 Quick start cho Gemini setup |
-| [GEMINI_MODELS.md](./GEMINI_MODELS.md) | 20 phút | 🔧 Chi tiết về multi-model fallback |
-| [TESTING.md](./TESTING.md) | 10 phút | 🧪 Hướng dẫn testing và coverage |
-| [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | 15 phút | 📂 Chi tiết cấu trúc và chức năng files |
-| [IMPROVEMENTS.md](./IMPROVEMENTS.md) | 5 phút | ✨ Tổng kết các cải tiến đã thực hiện |
+| [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | 5 phút | 🚀 Quick start siêu ngắn gọn |
+| [docs/QUICK_START_GEMINI.md](docs/QUICK_START_GEMINI.md) | 10 phút | 🤖 Hướng dẫn setup Gemini API |
+| [docs/GEMINI_MODELS.md](docs/GEMINI_MODELS.md) | 15 phút | 🔧 Chi tiết về multi-model fallback |
+| [docs/TESTING.md](docs/TESTING.md) | 10 phút | 🧪 Hướng dẫn testing và coverage |
+| [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | 15 phút | 📂 Chi tiết cấu trúc project |
 
 ### 📁 Cấu trúc project
 
-> 📖 **Chi tiết đầy đủ:** [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)
+> 📖 **Chi tiết đầy đủ:** [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
 
 ```
 RAG_pdf_new/
@@ -421,15 +459,12 @@ RAG_pdf_new/
 │   ├── test_gemini_setup.py      # Setup test script
 │   └── run_tests.py              # Test runner
 │
-├── 📚 Documentation
-│   ├── README.md                 # 👈 Bạn đang đọc file này
+├── 📚 docs/                      # Documentation
 │   ├── GETTING_STARTED.md        # Quick start 5 phút
-│   ├── QUICK_START_GEMINI.md     # Quick start Gemini
-│   ├── GEMINI_MODELS.md          # Multi-model docs
+│   ├── QUICK_START_GEMINI.md     # Hướng dẫn setup Gemini
+│   ├── GEMINI_MODELS.md          # Multi-model fallback
 │   ├── TESTING.md                # Testing guide
-│   ├── IMPROVEMENTS.md           # Changelog
-│   ├── DOCS_INDEX.md             # Documentation navigation
-│   └── PROJECT_STRUCTURE.md      # Chi tiết cấu trúc project
+│   └── PROJECT_STRUCTURE.md      # Chi tiết cấu trúc
 │
 └── 📝 Configuration
     ├── .env                      # API keys (không commit)
