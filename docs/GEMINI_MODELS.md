@@ -16,24 +16,31 @@ Dự án sử dụng hệ thống **tự động fallback** cho Gemini API với
 
 ```python
 GEMINI_MODELS = [
-    "gemini-2.0-flash-exp",  # Model chính - Gemini 2.0 Flash Experimental
-    "gemini-1.5-flash",      # Dự phòng 1 - Gemini 1.5 Flash (ổn định)
-    "gemini-1.5-flash-8b"    # Dự phòng 2 - Gemini 1.5 Flash 8B (nhẹ)
+    "gemini-2.5-flash",      # Model chính - Gemini 2.5 Flash (mới nhất)
+    "gemini-2.0-flash-exp",  # Dự phòng 1 - Gemini 2.0 Flash Experimental
+    "gemini-1.5-flash",      # Dự phòng 2 - Gemini 1.5 Flash (ổn định)
+    "gemini-1.5-flash-8b"    # Dự phòng 3 - Gemini 1.5 Flash 8B (nhẹ)
 ]
 ```
 
 ### Thứ tự ưu tiên:
-1. **Gemini 2.0 Flash Experimental** (`gemini-2.0-flash-exp`)
-   - Model mới nhất, mạnh nhất
+1. **Gemini 2.5 Flash** (`gemini-2.5-flash`)
+   - Model mới nhất, mạnh nhất (2025)
+   - Hiệu suất cao nhất trong dòng Flash
+   - Hỗ trợ đến **1M tokens** input
+   - Tốc độ và chất lượng vượt trội
+
+2. **Gemini 2.0 Flash Experimental** (`gemini-2.0-flash-exp`)
+   - Model thử nghiệm thế hệ 2.0
    - Hỗ trợ đến **1M tokens** input
    - Có thể không ổn định (experimental)
 
-2. **Gemini 1.5 Flash** (`gemini-1.5-flash`)
+3. **Gemini 1.5 Flash** (`gemini-1.5-flash`)
    - Model ổn định, production-ready
    - Hỗ trợ đến **1M tokens** input
    - Cân bằng tốt giữa tốc độ và chất lượng
 
-3. **Gemini 1.5 Flash 8B** (`gemini-1.5-flash-8b`)
+4. **Gemini 1.5 Flash 8B** (`gemini-1.5-flash-8b`)
    - Model nhẹ nhất, nhanh nhất
    - Tiêu thụ ít tài nguyên
    - Phù hợp cho tác vụ đơn giản
@@ -53,14 +60,21 @@ GEMINI_API_KEY_3=your_third_key_here
 
 ```
 ┌─────────────────────────────────────┐
-│  Model 1: gemini-2.0-flash-exp      │
+│  Model 1: gemini-2.5-flash          │
 │  ├─ Key 1 → Thử                     │
 │  ├─ Key 2 → Thử (nếu Key 1 fail)   │
 │  └─ Key 3 → Thử (nếu Key 2 fail)   │
 └─────────────────────────────────────┘
               ↓ (tất cả key fail)
 ┌─────────────────────────────────────┐
-│  Model 2: gemini-1.5-flash          │
+│  Model 2: gemini-2.0-flash-exp      │
+│  ├─ Key 1 → Thử                     │
+│  ├─ Key 2 → Thử (nếu Key 1 fail)   │
+│  └─ Key 3 → Thử (nếu Key 2 fail)   │
+└─────────────────────────────────────┘
+              ↓ (tất cả key fail)
+┌─────────────────────────────────────┐
+│  Model 3: gemini-1.5-flash          │
 │  ├─ Key 1 → Thử (reset về Key 1)   │
 │  ├─ Key 2 → Thử                     │
 │  └─ Key 3 → Thử                     │
@@ -105,7 +119,7 @@ response = client.generate_content("Your prompt here")
 from gemini_client import GeminiClient
 
 # Sử dụng danh sách model tùy chỉnh
-custom_models = ["gemini-2.0-flash-exp", "gemini-1.5-pro"]
+custom_models = ["gemini-2.5-flash", "gemini-2.0-flash-exp", "gemini-1.5-pro"]
 client = GeminiClient(model_names=custom_models)
 
 response = client.generate_content("Your prompt here")
@@ -116,12 +130,12 @@ response = client.generate_content("Your prompt here")
 Hệ thống ghi log chi tiết quá trình fallback:
 
 ```
-INFO: 🔑 Đang cấu hình Gemini với API Key #1, Model: gemini-2.0-flash-exp
+INFO: 🔑 Đang cấu hình Gemini với API Key #1, Model: gemini-2.5-flash
 WARNING: ⚠️ Lỗi khi gọi API: 429 Quota exceeded
 WARNING: Key #1 đã hết quota/rate limit
 INFO: 🔄 Chuyển sang API Key #2
-INFO: 🔑 Đang cấu hình Gemini với API Key #2, Model: gemini-2.0-flash-exp
-INFO: ✅ Request thành công với gemini-2.0-flash-exp, trả về text
+INFO: 🔑 Đang cấu hình Gemini với API Key #2, Model: gemini-2.5-flash
+INFO: ✅ Request thành công với gemini-2.5-flash, trả về text
 ```
 
 ## ⚙️ Tùy chỉnh
@@ -132,8 +146,9 @@ Chỉnh sửa `config.py`:
 
 ```python
 GEMINI_MODELS = [
-    "gemini-1.5-flash",      # Đổi lên làm model chính
-    "gemini-2.0-flash-exp",  # Đổi xuống làm dự phòng
+    "gemini-1.5-flash",      # Đổi lên làm model chính (nếu muốn ổn định hơn)
+    "gemini-2.5-flash",      # Đổi xuống làm dự phòng
+    "gemini-2.0-flash-exp",
     "gemini-1.5-flash-8b"
 ]
 ```
@@ -142,6 +157,7 @@ GEMINI_MODELS = [
 
 ```python
 GEMINI_MODELS = [
+    "gemini-2.5-flash",
     "gemini-2.0-flash-exp",
     "gemini-1.5-pro",        # Model mới
     "gemini-1.5-flash",

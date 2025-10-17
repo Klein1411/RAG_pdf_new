@@ -239,9 +239,10 @@ COLLECTION_NAME = "pdf_rag_collection"
 
 # Gemini models (theo thứ tự ưu tiên)
 GEMINI_MODELS = [
-    "gemini-2.0-flash-exp",  # Model chính
-    "gemini-1.5-flash",      # Dự phòng 1
-    "gemini-1.5-flash-8b"    # Dự phòng 2
+    "gemini-2.5-flash",      # Model chính (mới nhất)
+    "gemini-2.0-flash-exp",  # Dự phòng 1
+    "gemini-1.5-flash",      # Dự phòng 2
+    "gemini-1.5-flash-8b"    # Dự phòng 3
 ]
 
 # Gemini token limit

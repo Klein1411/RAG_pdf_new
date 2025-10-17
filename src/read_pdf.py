@@ -106,7 +106,7 @@ def extract_pdf_pages(path: str) -> List[Dict]:
     
     try:
         # Khởi tạo client - sẽ tự động sử dụng danh sách model từ config.py
-        # Model mặc định: gemini-2.0-flash-exp → gemini-1.5-flash → gemini-1.5-flash-8b
+        # Model mặc định: gemini-2.5-flash → gemini-2.0-flash-exp → gemini-1.5-flash → gemini-1.5-flash-8b
         gemini_client = GeminiClient()
         logger.info("✅ Gemini text client đã sẵn sàng với model fallback")
     except Exception as e:

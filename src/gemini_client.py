@@ -38,7 +38,7 @@ class GeminiClient:
                 self.model_names: List[str] = GEMINI_MODELS
             except ImportError:
                 # Fallback nếu không import được config
-                self.model_names: List[str] = ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-flash-8b"]
+                self.model_names: List[str] = ["gemini-2.5-flash", "gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-flash-8b"]
         else:
             self.model_names: List[str] = model_names
 

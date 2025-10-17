@@ -49,9 +49,10 @@ Mặc định sử dụng model từ `config.py`:
 
 ```python
 GEMINI_MODELS = [
-    "gemini-2.0-flash-exp",  # Model chính
-    "gemini-1.5-flash",      # Dự phòng 1
-    "gemini-1.5-flash-8b"    # Dự phòng 2
+    "gemini-2.5-flash",      # Model chính (mới nhất)
+    "gemini-2.0-flash-exp",  # Dự phòng 1
+    "gemini-1.5-flash",      # Dự phòng 2
+    "gemini-1.5-flash-8b"    # Dự phòng 3
 ]
 ```
 
@@ -66,7 +67,12 @@ GEMINI_MODELS = [
               │
               ▼
     ┌─────────────────────┐
-    │ Model 2.0 Flash     │──→ Success? ✅ → Return
+    │ Model 2.5 Flash     │──→ Success? ✅ → Return
+    └─────────────────────┘
+              │ Fail (quota/error)
+              ▼
+    ┌─────────────────────┐
+    │ Model 2.0 Flash Exp │──→ Success? ✅ → Return
     └─────────────────────┘
               │ Fail (quota/error)
               ▼

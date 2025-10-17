@@ -98,23 +98,26 @@ RAG_pdf_new/RAG_pdf_new/
 
 ```python
 
-# Gemini Models (theo thứ tự ưu tiên)**Sử dụng:**
+# Gemini Models (theo thứ tự ưu tiên)
 
-GEMINI_MODELS = [```bash
-
-    "gemini-2.0-flash-exp",  # Primarypython read_pdf.py
-
-    "gemini-1.5-flash",      # Backup 1# Chọn Y/N cho Gemini Vision
-
-    "gemini-1.5-flash-8b"    # Backup 2```
-
+```python
+GEMINI_MODELS = [
+    "gemini-2.5-flash",      # Primary (mới nhất)
+    "gemini-2.0-flash-exp",  # Backup 1
+    "gemini-1.5-flash",      # Backup 2
+    "gemini-1.5-flash-8b"    # Backup 3
 ]
-
----
+```
 
 # Paths
 
-PDF_PATH = "data/pdfs/your_document.pdf"### 3. `export_md.py` (86 lines)
+```python
+PDF_PATH = "data/pdfs/your_document.pdf"
+```
+
+---
+
+### 3. `export_md.py` (86 lines)
 
 **Chức năng:** Convert kết quả PDF extraction sang Markdown
 
