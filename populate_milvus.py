@@ -8,6 +8,8 @@ from milvus import get_or_create_collection
 from config import PDF_PATH, EMBEDDING_MODEL_NAME, EMBEDDING_DIM, COLLECTION_NAME
 from export_md import convert_to_markdown
 
+import nltk
+
 def get_embedding_model():
     """
     Khởi tạo và trả về model embedding, ưu tiên sử dụng GPU nếu có.
@@ -23,30 +25,62 @@ def get_embedding_model():
         print(f"   -> ❌ Lỗi khi tải model: {e}")
         return None
 
-def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200):
+def download_nltk_punkt():
     """
-    Chia một đoạn văn bản dài thành các đoạn nhỏ hơn (chunks) với sự chồng lấn (overlap).
-    Sử dụng phương pháp cửa sổ trượt (sliding window).
+    Kiểm tra và tải về các gói tokenizer cần thiết của NLTK.
+    """
+    try:
+        # Phải kiểm tra cả hai tài nguyên, nếu một trong hai thiếu, sẽ gây ra LookupError
+        nltk.data.find('tokenizers/punkt')
+        nltk.data.find('tokenizers/punkt_tab')
+    except LookupError:
+        print("   -> 📖 Đang tải các gói tokenizer cần thiết cho NLTK ('punkt', 'punkt_tab')...")
+        nltk.download('punkt', quiet=True)
+        nltk.download('punkt_tab', quiet=True)
+        print("   -> ✅ Tải tokenizer hoàn tất.")
+
+def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap_sentences: int = 2):
+    """
+    Chia văn bản thành các chunk một cách thông minh, dựa trên ranh giới câu.
+    Sử dụng NLTK để tách câu và nhóm chúng lại, với sự gối đầu giữa các chunk.
+    
+    Args:
+        text (str): Đoạn văn bản cần chia.
+        chunk_size (int): Kích thước tối đa (số ký tự) của mỗi chunk.
+        chunk_overlap_sentences (int): Số câu gối đầu giữa các chunk liên tiếp.
     """
     if not text:
         return []
-    
-    # Đảm bảo overlap hợp lệ
-    if chunk_overlap >= chunk_size:
-        # In ra cảnh báo và điều chỉnh thay vì gây lỗi
-        print(f"   -> ⚠️ Cảnh báo: chunk_overlap ({chunk_overlap}) lớn hơn hoặc bằng chunk_size ({chunk_size}). Đã tự động tắt overlap.")
-        chunk_overlap = 0
 
-    chunks = []
-    start_index = 0
+    # 1. Tách văn bản thành các câu
+    sentences = nltk.sent_tokenize(text)
     
-    while start_index < len(text):
-        end_index = start_index + chunk_size
-        chunks.append(text[start_index:end_index])
+    # 2. Nhóm các câu thành các chunk
+    chunks = []
+    current_chunk_sentences = []
+    current_length = 0
+    
+    for i, sentence in enumerate(sentences):
+        sentence_length = len(sentence)
         
-        # Dịch chuyển cửa sổ về phía trước
-        step = chunk_size - chunk_overlap
-        start_index += step
+        # Nếu thêm câu này vào sẽ quá dài, hãy hoàn thành chunk hiện tại
+        if current_length + sentence_length > chunk_size and current_chunk_sentences:
+            chunks.append(" ".join(current_chunk_sentences))
+            
+            # Bắt đầu chunk mới với sự gối đầu
+            # Lấy N câu cuối từ chunk vừa hoàn thành để làm phần gối đầu
+            overlap_start_index = max(0, len(current_chunk_sentences) - chunk_overlap_sentences)
+            current_chunk_sentences = current_chunk_sentences[overlap_start_index:]
+            # Cần tính lại độ dài của chunk mới sau khi có overlap
+            current_length = len(" ".join(current_chunk_sentences))
+
+        # Thêm câu vào chunk hiện tại (dù là chunk mới hay cũ)
+        current_chunk_sentences.append(sentence)
+        current_length += sentence_length
+
+    # Đừng quên chunk cuối cùng
+    if current_chunk_sentences:
+        chunks.append(" ".join(current_chunk_sentences))
         
     return chunks
 
@@ -55,6 +89,7 @@ def populate_database():
     Hàm chính: Tự động tạo file Markdown nếu cần, đọc nội dung,
     tạo embedding, và lưu vào Milvus.
     """
+    download_nltk_punkt() # Đảm bảo NLTK đã sẵn sàng
     print("--- BẮT ĐẦU QUÁ TRÌNH ĐỒNG BỘ DỮ LIỆU VÀO MILVUS ---")
 
     # --- Bước 1: Đảm bảo file Markdown tồn tại ---
