@@ -43,14 +43,14 @@ Khi trả lời:
 
 # Tool settings
 ENABLE_RAG_TOOL = True  # Bật/tắt RAG tool
-ENABLE_SEARCH_TOOL = True  # Bật/tắt search tool (future)
+ENABLE_SEARCH_TOOL = False  # Bật/tắt search tool (future)
 ENABLE_CALCULATOR_TOOL = False  # Bật/tắt calculator (future)
 
 # RAG tool settings
 RAG_TOOL_NAME = "search_documents"
 RAG_TOOL_DESCRIPTION = "Tìm kiếm thông tin trong tài liệu PDF đã được index. Sử dụng khi cần tra cứu thông tin cụ thể."
-RAG_MAX_RESULTS = 5  # Số kết quả tối đa từ RAG
-RAG_SIMILARITY_THRESHOLD = 0.3  # Ngưỡng similarity (0-1)
+RAG_MAX_RESULTS = 15  # Số kết quả tối đa từ RAG (tăng lên 15)
+RAG_SIMILARITY_THRESHOLD = 0.15  # Ngưỡng similarity (0-1), giảm xuống cho L2 distance
 
 # Conversation settings
 MAX_CONVERSATION_HISTORY = 10  # Số lượt hội thoại giữ lại

@@ -57,7 +57,7 @@ class RAGTool:
         self.collection = self._init_milvus_collection()
         
         # Khởi tạo LLM client
-        self.llm_client = self._init_llm_client()
+        self.llm_client, self.model_choice, self.ollama_model_name = self._init_llm_client()
         
         logger.info("✅ RAG Tool đã sẵn sàng")
     
@@ -91,13 +91,27 @@ class RAGTool:
             raise
     
     def _init_llm_client(self):
-        """Khởi tạo LLM client."""
+        """
+        Khởi tạo LLM client.
+        
+        Returns:
+            Tuple of (llm_client, model_choice, ollama_model_name)
+        """
         logger.info("Khởi tạo LLM client cho RAG")
         
         try:
-            llm_client, llm_name = initialize_and_select_llm()
-            logger.info(f"Sử dụng LLM: {llm_name}")
-            return llm_client
+            model_choice, gemini_client, ollama_model_name = initialize_and_select_llm()
+            
+            # Lưu thông tin model
+            if model_choice == '1':
+                self.llm_name = "Gemini"
+                logger.info(f"Sử dụng LLM: {self.llm_name}")
+                return gemini_client, model_choice, ollama_model_name
+            else:
+                self.llm_name = f"Ollama ({ollama_model_name})"
+                logger.info(f"Sử dụng LLM: {self.llm_name}")
+                return None, model_choice, ollama_model_name
+                
         except Exception as e:
             logger.error(f"Lỗi khi khởi tạo LLM: {e}")
             raise
@@ -105,8 +119,8 @@ class RAGTool:
     def search(
         self, 
         query: str, 
-        top_k: int = None,
-        threshold: float = None
+        top_k: Optional[int] = None,
+        threshold: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Search thông tin trong RAG system.
@@ -128,8 +142,8 @@ class RAGTool:
             # Encode query
             query_embedding = self.embedding_model.encode([query])[0].tolist()
             
-            # Search trong Milvus
-            search_params = {"metric_type": "COSINE", "params": {"nprobe": 10}}
+            # Search trong Milvus (sử dụng L2 distance thay vì COSINE)
+            search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
             results = self.collection.search(
                 data=[query_embedding],
                 anns_field="embedding",
@@ -150,14 +164,25 @@ class RAGTool:
                 }
             
             # Filter by threshold và format results
+            # Với L2 distance: càng nhỏ càng giống nhau
+            # L2 distance range: [0, ∞), nên càng nhỏ càng tốt
+            # Để dễ hiểu: chuyển L2 sang similarity score [0, 1]
+            # similarity = 1 / (1 + distance)
             formatted_results = []
+            
+            logger.info(f"📊 Distances from Milvus:")
             for hit in results[0]:
-                if hit.distance >= threshold:
+                # Chuyển L2 distance thành similarity score
+                similarity = 1.0 / (1.0 + hit.distance)
+                logger.info(f"   - Distance: {hit.distance:.4f}, Similarity: {similarity:.4f}")
+                
+                # Chỉ lấy kết quả có similarity >= threshold
+                if similarity >= threshold:
                     formatted_results.append({
                         "text": hit.entity.get('text'),
                         "page": hit.entity.get('page'),
                         "source": hit.entity.get('pdf_source'),
-                        "score": float(hit.distance)
+                        "score": float(similarity)
                     })
             
             logger.info(f"✅ Tìm thấy {len(formatted_results)} kết quả")
@@ -181,7 +206,7 @@ class RAGTool:
     def ask(
         self, 
         question: str,
-        top_k: int = None,
+        top_k: Optional[int] = None,
         return_context: bool = False
     ) -> Dict[str, Any]:
         """
@@ -242,9 +267,10 @@ Lưu ý:
             # Generate answer
             logger.info("Đang generate câu trả lời...")
             answer = generate_answer_with_fallback(
-                self.llm_client,
                 prompt,
-                max_retries=2
+                self.model_choice,
+                self.llm_client,
+                self.ollama_model_name
             )
             
             logger.info("✅ Đã generate câu trả lời")
@@ -305,14 +331,15 @@ if __name__ == "__main__":
     
     # Test search
     print("2. Test search...")
-    search_result = tool.search("artificial intelligence", top_k=3)
+    search_result = tool.search("chỉ số ROUGE", top_k=15)  # Vietnamese query, top_k=15
     print(f"   Found: {search_result['count']} results")
     if search_result['results']:
-        print(f"   Top result: {search_result['results'][0]['text'][:100]}...\n")
+        print(f"   Top result: {search_result['results'][0]['text'][:100]}...")
+        print(f"   Score: {search_result['results'][0]['score']:.4f}\n")
     
     # Test ask
-    print("3. Test ask...")
-    answer_result = tool.ask("What is artificial intelligence?", top_k=3)
+    print("\n3. Test ask...")
+    answer_result = tool.ask("ROUGE là gì?", top_k=15)  # Vietnamese question, top_k=15
     print(f"   Answer: {answer_result['answer'][:200]}...")
     print(f"   Sources: {len(answer_result['sources'])} documents\n")
     
