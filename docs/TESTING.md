@@ -1,88 +1,137 @@
-# Testing Guide
+# 🧪 Testing Guide
 
-> 📖 **Xem hướng dẫn đầy đủ tại:** [README.md](./README.md)
+Hướng dẫn chạy tests cho RAG PDF project.
 
-## Cài đặt dependencies
+---
+
+## 📦 Cài đặt
 
 ```bash
-pip install -r requirements.txt
+pip install pytest pytest-cov pytest-mock
 ```
 
-## Chạy Unit Tests
+---
+
+## 🎯 Có 2 loại tests
+
+### 1. Unit Tests (`test_gemini_client.py`)
+- **Mục đích:** Test logic code với mocking
+- **Đặc điểm:** Nhanh, không gọi API thật
+- **Coverage:** 85%+
+
+### 2. Integration Tests (`test_gemini_setup.py`)
+- **Mục đích:** Test setup thực tế với API
+- **Đặc điểm:** Gọi API thật, verify cấu hình
+- **Yêu cầu:** Có `.env` với API keys hợp lệ
+
+---
+
+## 🚀 Chạy Tests
 
 ### Chạy tất cả tests
 ```bash
-pytest test_gemini_client.py -v
+# Tất cả tests
+pytest tests/ -v
+
+# Chỉ unit tests
+pytest tests/test_gemini_client.py -v
+
+# Chỉ integration test
+python -m tests.test_gemini_setup
 ```
 
-### Chạy với coverage report
+### Chạy với coverage
 ```bash
-pytest test_gemini_client.py -v --cov=gemini_client --cov-report=html
+# Coverage report trong terminal
+pytest tests/test_gemini_client.py --cov=src.gemini_client --cov-report=term-missing
+
+# Generate HTML report
+pytest tests/test_gemini_client.py --cov=src.gemini_client --cov-report=html
 ```
 
-### Chạy một test cụ thể
+### Chạy test cụ thể
 ```bash
-pytest test_gemini_client.py::TestGeminiClientInitialization::test_init_with_multiple_keys -v
+# Chạy 1 test function
+pytest tests/test_gemini_client.py::TestGeminiClientInitialization::test_init_with_multiple_keys -v
+
+# Chạy 1 test class
+pytest tests/test_gemini_client.py::TestKeyRotation -v
 ```
 
-### Chạy tests theo class
-```bash
-pytest test_gemini_client.py::TestKeyRotation -v
-```
+---
 
-## Logging
+## 📊 Coverage Report
 
-### Cấu hình logging level
+Sau khi chạy với `--cov-report=html`:
 
-Mặc định, logging được set ở level INFO. Để thay đổi:
-
-```python
-import logging
-logging.getLogger('gemini_client').setLevel(logging.DEBUG)
-```
-
-### Xem logs khi chạy tests
-```bash
-pytest test_gemini_client.py -v -s
-```
-
-## Coverage Report
-
-Sau khi chạy với `--cov-report=html`, mở file:
 ```bash
 # Windows
 start htmlcov/index.html
 
-# Linux/Mac
+# Linux/Mac  
 open htmlcov/index.html
 ```
 
-## Test Structure
+**Target coverage:** > 85%
 
-- `TestGeminiClientInitialization`: Tests cho khởi tạo client
-- `TestKeyRotation`: Tests cho chức năng xoay vòng API keys
-- `TestGenerateContent`: Tests cho hàm tạo nội dung
-- `TestCountTokens`: Tests cho hàm đếm tokens
-- `TestEdgeCases`: Tests cho các trường hợp đặc biệt
+---
 
-## Mocking
+## 🔍 Test Structure
 
-Tests sử dụng `unittest.mock` để mock:
-- `genai.configure()`: Mock việc cấu hình API key
-- `genai.GenerativeModel()`: Mock model instance
-- Environment variables: Mock API keys từ `.env`
+### Unit Tests (`test_gemini_client.py`)
 
-## Best Practices
+| Test Class | Mô tả |
+|-----------|-------|
+| `TestGeminiClientInitialization` | Tests khởi tạo client |
+| `TestKeyRotation` | Tests rotation API keys |
+| `TestGenerateContent` | Tests tạo nội dung |
+| `TestCountTokens` | Tests đếm tokens |
+| `TestEdgeCases` | Tests edge cases |
 
-1. **Isolation**: Mỗi test độc lập, không phụ thuộc vào test khác
-2. **Mocking**: Mock tất cả external dependencies (API calls, env vars)
-3. **Coverage**: Đảm bảo coverage > 90%
-4. **Naming**: Tên test rõ ràng, mô tả chính xác behavior đang test
+### Integration Tests (`test_gemini_setup.py`)
+
+| Test Function | Mô tả |
+|--------------|-------|
+| `test_gemini_basic()` | Khởi tạo GeminiClient |
+| `test_text_generation()` | Generate text thật |
+| `test_token_counting()` | Đếm tokens |
+| `test_config()` | Verify config |
+
+---
+
+## 🛠️ Advanced
+
+### Xem logs chi tiết
+```bash
+pytest tests/ -v -s --log-cli-level=INFO
+```
+
+### Chạy parallel (nhanh hơn)
+```bash
+pip install pytest-xdist
+pytest tests/ -v -n auto
+```
+
+### Debug test
+```bash
+pytest tests/test_gemini_client.py::test_name -v --pdb
+```
+
+---
+
+## ✅ Best Practices
+
+1. **Isolation:** Mỗi test độc lập, không phụ thuộc nhau
+2. **Mocking:** Mock external dependencies (API, env vars)
+3. **Coverage:** Maintain > 85% coverage
+4. **Fast:** Unit tests phải chạy nhanh (< 1s mỗi test)
+5. **Clear naming:** Tên test mô tả rõ ràng behavior
 
 ---
 
 ## 📚 Xem thêm
 
-- [README.md](./README.md) - Hướng dẫn đầy đủ
-- [GETTING_STARTED.md](./GETTING_STARTED.md) - Quick start 5 phút
-- [IMPROVEMENTS.md](./IMPROVEMENTS.md) - Changelog và improvements
+- [../README.md](../README.md) - Main documentation
+- [GETTING_STARTED.md](GETTING_STARTED.md) - Quick start
+- [QUICK_START_GEMINI.md](QUICK_START_GEMINI.md) - Gemini setup
+- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Project structure

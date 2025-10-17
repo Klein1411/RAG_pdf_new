@@ -108,9 +108,8 @@ RAG_pdf_new/
 │   └── logging_config.py    # 📝 Logging setup
 │
 ├── tests/                    # 🧪 Test files
-│   ├── test_gemini_client.py
-│   ├── test_gemini_setup.py
-│   └── run_tests.py
+│   ├── test_gemini_client.py    # Unit tests
+│   └── test_gemini_setup.py     # Integration tests
 │
 ├── docs/                     # 📚 Documentation
 │   ├── GETTING_STARTED.md
@@ -454,10 +453,9 @@ RAG_pdf_new/
 │   ├── llm_handler.py            # LLM abstraction (Gemini/Ollama)
 │   └── qa_app.py                 # Q&A application
 │
-├── 🧪 Test Files
-│   ├── test_gemini_client.py     # Unit tests
-│   ├── test_gemini_setup.py      # Setup test script
-│   └── run_tests.py              # Test runner
+├── 🧪 tests/
+│   ├── test_gemini_client.py     # Unit tests (pytest + mocking)
+│   └── test_gemini_setup.py      # Integration tests (real API)
 │
 ├── 📚 docs/                      # Documentation
 │   ├── GETTING_STARTED.md        # Quick start 5 phút
