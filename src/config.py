@@ -5,6 +5,9 @@
 # Hoặc có thể dùng đường dẫn tương đối nếu muốn, ví dụ: "data/pdfs/file.pdf"
 PDF_PATH = "d:/Project_self/data/pdfs/metric.pdf"
 
+# Thư mục chứa PDF files
+PDF_DIR = "data/pdfs"
+
 # Thư mục lưu file Markdown output
 OUTPUT_DIR = "data/outputs"
 
