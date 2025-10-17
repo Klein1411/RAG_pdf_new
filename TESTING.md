@@ -1,5 +1,7 @@
 # Testing Guide
 
+> 📖 **Xem hướng dẫn đầy đủ tại:** [README.md](./README.md)
+
 ## Cài đặt dependencies
 
 ```bash
@@ -76,3 +78,11 @@ Tests sử dụng `unittest.mock` để mock:
 2. **Mocking**: Mock tất cả external dependencies (API calls, env vars)
 3. **Coverage**: Đảm bảo coverage > 90%
 4. **Naming**: Tên test rõ ràng, mô tả chính xác behavior đang test
+
+---
+
+## 📚 Xem thêm
+
+- [README.md](./README.md) - Hướng dẫn đầy đủ
+- [GETTING_STARTED.md](./GETTING_STARTED.md) - Quick start 5 phút
+- [IMPROVEMENTS.md](./IMPROVEMENTS.md) - Changelog và improvements

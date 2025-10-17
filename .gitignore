@@ -86,11 +86,6 @@ Desktop.ini
 !test.pdf
 
 # Markdown exports (generated files)
-*.md
-!README.md
-!TESTING.md
-!IMPROVEMENTS.md
-!CONTRIBUTING.md
 
 # where to load file test
 pdf_place/
