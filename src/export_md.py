@@ -87,12 +87,15 @@ def convert_to_markdown(pdf_path: str) -> str:
         return f"# Lỗi\n\nĐã có lỗi xảy ra trong quá trình tạo Markdown: {e}"
 
 if __name__ == "__main__":
-    from src.config import PDF_PATH
+    from src.config import PDF_PATH, OUTPUT_DIR
     
     markdown_output = convert_to_markdown(PDF_PATH)
     
+    # Tạo thư mục output nếu chưa tồn tại
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
     output_filename = os.path.splitext(os.path.basename(PDF_PATH))[0] + ".md"
-    output_filepath = os.path.join(os.path.dirname(PDF_PATH), output_filename)
+    output_filepath = os.path.join(OUTPUT_DIR, output_filename)
 
     logger.info(f"Lưu kết quả vào file: {output_filepath}")
     print(f"（*＾3＾)/~☆ Lưu kết quả vào file: {output_filepath}")

@@ -12,7 +12,7 @@ if str(project_root) not in sys.path:
 
 # Import các thành phần cần thiết từ các file khác
 from src.milvus import get_or_create_collection
-from src.config import PDF_PATH, EMBEDDING_MODEL_NAME, EMBEDDING_DIM, COLLECTION_NAME
+from src.config import PDF_PATH, EMBEDDING_MODEL_NAME, EMBEDDING_DIM, COLLECTION_NAME, OUTPUT_DIR
 from src.export_md import convert_to_markdown
 from src.logging_config import get_logger
 
@@ -113,24 +113,28 @@ def populate_database():
     logger.info("Bước 1: Chuẩn bị file Markdown nguồn")
     print("\n--- Bước 1: Chuẩn bị file Markdown nguồn ---")
     md_filename = os.path.splitext(os.path.basename(PDF_PATH))[0] + ".md"
-    md_filepath = os.path.join(os.path.dirname(PDF_PATH), md_filename)
+    md_filepath = os.path.join(OUTPUT_DIR, md_filename)
 
     if not os.path.exists(md_filepath):
-        logger.warning(f"File '{md_filename}' không tồn tại, tạo mới từ PDF")
-        print(f"   -> ⚠️ File '{md_filename}' không tồn tại. Tự động tạo mới từ PDF...")
+        logger.warning(f"File '{md_filename}' không tồn tại trong {OUTPUT_DIR}, tạo mới từ PDF")
+        print(f"   -> ⚠️ File '{md_filename}' không tồn tại trong {OUTPUT_DIR}. Tự động tạo mới từ PDF...")
+        
+        # Tạo thư mục output nếu chưa tồn tại
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        
         markdown_content = convert_to_markdown(PDF_PATH)
         try:
             with open(md_filepath, "w", encoding="utf-8") as f:
                 f.write(markdown_content)
-            logger.info(f"Đã tạo và lưu file '{md_filename}' thành công")
-            print(f"   -> ✅ Đã tạo và lưu file '{md_filename}' thành công.")
+            logger.info(f"Đã tạo và lưu file '{md_filename}' vào {OUTPUT_DIR}")
+            print(f"   -> ✅ Đã tạo và lưu file '{md_filename}' vào {OUTPUT_DIR}.")
         except Exception as e:
             logger.error(f"Lỗi khi lưu file Markdown: {e}")
             print(f"   -> ❌ Lỗi khi lưu file Markdown: {e}")
             return
     else:
-        logger.info(f"Đã tìm thấy file '{md_filename}'")
-        print(f"   -> ✅ Đã tìm thấy file '{md_filename}'.")
+        logger.info(f"Đã tìm thấy file '{md_filename}' trong {OUTPUT_DIR}")
+        print(f"   -> ✅ Đã tìm thấy file '{md_filename}' trong {OUTPUT_DIR}.")
 
     # --- Bước 2: Đọc và xử lý file Markdown ---
     logger.info(f"Bước 2: Đọc file {md_filename}")

@@ -3,7 +3,10 @@
 # **QUAN TRỌNG**: Đặt đường dẫn đến file PDF của bạn ở đây.
 # Ví dụ: "C:\Users\MyUser\Documents\file.pdf"
 # Hoặc có thể dùng đường dẫn tương đối nếu muốn, ví dụ: "data/pdfs/file.pdf"
-PDF_PATH = "d:/Project_self/data/pdfs/Artificial-Intelligence-A-Modern-Approach-3rd-Edition (Ingles).pdf"
+PDF_PATH = "d:/Project_self/data/pdfs/metric.pdf"
+
+# Thư mục lưu file Markdown output
+OUTPUT_DIR = "data/outputs"
 
 
 # --- CẤU HÌNH CHUNG CHO MODEL VÀ MILVUS ---
