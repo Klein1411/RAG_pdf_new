@@ -1,7 +1,14 @@
 # llm_handler.py
 
+import sys
+from pathlib import Path
 import time
 import requests
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Sử dụng GeminiClient mới, một class quản lý stateful
 from src.gemini_client import GeminiClient

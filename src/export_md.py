@@ -1,4 +1,12 @@
 import os
+import sys
+from pathlib import Path
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from src.read_pdf import extract_pdf_pages
 from src.logging_config import get_logger
 

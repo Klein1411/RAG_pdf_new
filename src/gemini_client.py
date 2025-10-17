@@ -1,9 +1,16 @@
 import os
+import sys
+from pathlib import Path
 import logging
 from typing import Union, List, Optional
 import dotenv
 import google.generativeai as genai
 from google.generativeai.types import GenerateContentResponse
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

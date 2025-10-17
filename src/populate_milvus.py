@@ -1,7 +1,14 @@
+import sys
+from pathlib import Path
 import torch
 from sentence_transformers import SentenceTransformer
 import os
 import re
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Import các thành phần cần thiết từ các file khác
 from src.milvus import get_or_create_collection

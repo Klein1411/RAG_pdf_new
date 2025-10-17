@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 from pymilvus import (
     connections,
@@ -8,6 +10,12 @@ from pymilvus import (
     DataType,
     Collection
 )
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from src.logging_config import get_logger
 
 logger = get_logger(__name__)

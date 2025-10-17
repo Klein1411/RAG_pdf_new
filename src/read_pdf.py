@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 import logging
 import pdfplumber
 from typing import List, Dict
@@ -7,6 +9,11 @@ from PIL import Image
 import numpy as np
 import torch
 import easyocr
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Import class GeminiClient
 from src.gemini_client import GeminiClient
@@ -105,8 +112,6 @@ def extract_pdf_pages(path: str) -> List[Dict]:
     vision_client = None
     
     try:
-        # Khởi tạo client - sẽ tự động sử dụng danh sách model từ config.py
-        # Model mặc định: gemini-2.5-flash → gemini-2.0-flash-exp → gemini-1.5-flash → gemini-1.5-flash-8b
         gemini_client = GeminiClient()
         logger.info("✅ Gemini text client đã sẵn sàng với model fallback")
     except Exception as e:
