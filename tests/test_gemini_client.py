@@ -1,7 +1,16 @@
 """
 Unit tests cho GeminiClient class.
-Chạy với: pytest test_gemini_client.py -v
+Chạy với: pytest tests/test_gemini_client.py -v
+Hoặc: python tests/test_gemini_client.py (chạy trực tiếp)
 """
+
+import sys
+from pathlib import Path
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 import os
 import pytest
@@ -12,13 +21,14 @@ from src.gemini_client import GeminiClient
 class TestGeminiClientInitialization:
     """Test khởi tạo GeminiClient"""
     
+    @patch('src.gemini_client.dotenv.load_dotenv')  # Mock load_dotenv
     @patch.dict(os.environ, {
         "GEMINI_API_KEY_1": "test_key_1",
         "GEMINI_API_KEY_2": "test_key_2"
-    })
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
-    def test_init_with_multiple_keys(self, mock_model, mock_configure):
+    }, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
+    def test_init_with_multiple_keys(self, mock_model, mock_configure, mock_load_dotenv):
         """Test khởi tạo với nhiều API keys"""
         client = GeminiClient()
         
@@ -27,22 +37,25 @@ class TestGeminiClientInitialization:
         assert client.api_keys[1] == "test_key_2"
         assert client.current_key_index == 0
         mock_configure.assert_called_once_with(api_key="test_key_1")
+        mock_load_dotenv.assert_called_once()
     
+    @patch('src.gemini_client.dotenv.load_dotenv')
     @patch.dict(os.environ, {}, clear=True)
-    def test_init_without_keys_raises_error(self):
+    def test_init_without_keys_raises_error(self, mock_load_dotenv):
         """Test khởi tạo khi không có API key sẽ raise ValueError"""
         with pytest.raises(ValueError, match="Không tìm thấy biến môi trường GEMINI_API_KEY"):
             GeminiClient()
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key_1"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
-    def test_init_with_custom_model_name(self, mock_model, mock_configure):
-        """Test khởi tạo với tên model tùy chỉnh"""
-        client = GeminiClient(model_name="gemini-pro")
+    @patch('src.gemini_client.dotenv.load_dotenv')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key_1"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
+    def test_init_with_custom_model_names(self, mock_model, mock_configure, mock_load_dotenv):
+        """Test khởi tạo với model names tùy chỉnh"""
+        client = GeminiClient(model_names=["gemini-pro"])
         
-        assert client.model_name == "gemini-pro"
-        mock_model.assert_called_once_with("gemini-pro")
+        assert client.model_names == ["gemini-pro"]
+        assert len(client.api_keys) == 1
 
 
 class TestKeyRotation:
@@ -52,9 +65,9 @@ class TestKeyRotation:
         "GEMINI_API_KEY_1": "key_1",
         "GEMINI_API_KEY_2": "key_2",
         "GEMINI_API_KEY_3": "key_3"
-    })
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    }, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_switch_to_next_key(self, mock_model, mock_configure):
         """Test chuyển sang key tiếp theo"""
         client = GeminiClient()
@@ -67,9 +80,9 @@ class TestKeyRotation:
         assert client.current_key_index == 1
         mock_configure.assert_called_once_with(api_key="key_2")
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "key_1"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "key_1"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_switch_to_next_key_when_no_more_keys(self, mock_model, mock_configure):
         """Test chuyển key khi đã hết key"""
         client = GeminiClient()
@@ -85,9 +98,9 @@ class TestKeyRotation:
 class TestGenerateContent:
     """Test hàm generate_content"""
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_generate_content_success(self, mock_model_class, mock_configure):
         """Test generate content thành công"""
         # Setup mock
@@ -103,9 +116,9 @@ class TestGenerateContent:
         assert result == "Generated text response"
         mock_model_instance.generate_content.assert_called_once_with("Test prompt")
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_generate_content_with_full_response(self, mock_model_class, mock_configure):
         """Test generate content trả về full response"""
         mock_model_instance = MagicMock()
@@ -121,9 +134,9 @@ class TestGenerateContent:
     @patch.dict(os.environ, {
         "GEMINI_API_KEY_1": "key_1",
         "GEMINI_API_KEY_2": "key_2"
-    })
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    }, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_generate_content_auto_retry_on_quota_error(self, mock_model_class, mock_configure):
         """Test tự động retry khi gặp lỗi quota"""
         mock_model_instance = MagicMock()
@@ -144,9 +157,9 @@ class TestGenerateContent:
         assert client.current_key_index == 1
         assert mock_model_instance.generate_content.call_count == 2
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "invalid_key"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "invalid_key"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_generate_content_raises_on_all_keys_fail(self, mock_model_class, mock_configure):
         """Test raise exception khi tất cả key đều fail"""
         mock_model_instance = MagicMock()
@@ -155,16 +168,16 @@ class TestGenerateContent:
         
         client = GeminiClient()
         
-        with pytest.raises(ConnectionError, match="không hợp lệ"):
+        with pytest.raises(ConnectionError, match="Tất cả các API key và model"):
             client.generate_content("Test prompt")
 
 
 class TestCountTokens:
     """Test hàm count_tokens"""
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_count_tokens_success(self, mock_model_class, mock_configure):
         """Test đếm token thành công"""
         mock_model_instance = MagicMock()
@@ -179,9 +192,9 @@ class TestCountTokens:
         assert result == 42
         mock_model_instance.count_tokens.assert_called_once_with("Test prompt")
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_count_tokens_with_list_prompt(self, mock_model_class, mock_configure):
         """Test đếm token với list prompt (vision)"""
         mock_model_instance = MagicMock()
@@ -200,9 +213,9 @@ class TestCountTokens:
 class TestEdgeCases:
     """Test các trường hợp đặc biệt"""
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_generate_content_with_empty_string(self, mock_model_class, mock_configure):
         """Test với prompt rỗng"""
         mock_model_instance = MagicMock()
@@ -216,9 +229,9 @@ class TestEdgeCases:
         
         assert result == ""
     
-    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"})
-    @patch('gemini_client.genai.configure')
-    @patch('gemini_client.genai.GenerativeModel')
+    @patch.dict(os.environ, {"GEMINI_API_KEY_1": "test_key"}, clear=True)
+    @patch('src.gemini_client.genai.configure')
+    @patch('src.gemini_client.genai.GenerativeModel')
     def test_generate_content_with_very_long_prompt(self, mock_model_class, mock_configure):
         """Test với prompt rất dài"""
         mock_model_instance = MagicMock()
@@ -237,3 +250,4 @@ class TestEdgeCases:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
+

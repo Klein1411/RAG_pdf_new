@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """
 Test script để kiểm tra cấu hình Gemini với multi-model fallback
+Chạy với: python tests/test_gemini_setup.py
+Hoặc: python -m tests.test_gemini_setup
 """
+
+import sys
+from pathlib import Path
+
+# Thêm thư mục gốc project vào sys.path để import src module
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from src.gemini_client import GeminiClient
 from src.config import GEMINI_MODELS
