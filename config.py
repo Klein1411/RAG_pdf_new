@@ -32,4 +32,11 @@ OLLAMA_MODELS = [
 ]
 
 # --- CẤU HÌNH CHO GEMINI ---
-GEMINI_INPUT_TOKEN_LIMIT = 100000 # Giới hạn token an toàn cho prompt gửi đến Gemini
+# Danh sách các model Gemini theo thứ tự ưu tiên (model đầu tiên là chính, các model sau là dự phòng)
+GEMINI_MODELS = [
+    "gemini-2.0-flash-exp",  # Model chính - Gemini 2.0 Flash (thử nghiệm, mạnh nhất)
+    "gemini-1.5-flash",      # Dự phòng 1 - Gemini 1.5 Flash (ổn định)
+    "gemini-1.5-flash-8b"    # Dự phòng 2 - Gemini 1.5 Flash 8B (nhẹ nhất)
+]
+
+GEMINI_INPUT_TOKEN_LIMIT = 1000000 # Giới hạn token an toàn cho prompt gửi đến Gemini (2.0 Flash hỗ trợ đến 1M tokens)

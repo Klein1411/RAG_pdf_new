@@ -7,21 +7,27 @@ import re
 from milvus import get_or_create_collection
 from config import PDF_PATH, EMBEDDING_MODEL_NAME, EMBEDDING_DIM, COLLECTION_NAME
 from export_md import convert_to_markdown
+from logging_config import get_logger
 
 import nltk
+
+logger = get_logger(__name__)
 
 def get_embedding_model():
     """
     Khởi tạo và trả về model embedding, ưu tiên sử dụng GPU nếu có.
     """
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"Tải model embedding '{EMBEDDING_MODEL_NAME}' lên device '{device}'")
     print(f"🤖 Đang tải model embedding '{EMBEDDING_MODEL_NAME}' lên '{device}'...")
     
     try:
         model = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
+        logger.info("Model embedding đã tải thành công")
         print("   -> ✅ Model đã tải thành công!")
         return model
     except Exception as e:
+        logger.error(f"Lỗi khi tải model embedding: {e}")
         print(f"   -> ❌ Lỗi khi tải model: {e}")
         return None
 
@@ -33,10 +39,13 @@ def download_nltk_punkt():
         # Phải kiểm tra cả hai tài nguyên, nếu một trong hai thiếu, sẽ gây ra LookupError
         nltk.data.find('tokenizers/punkt')
         nltk.data.find('tokenizers/punkt_tab')
+        logger.info("NLTK tokenizer đã có sẵn")
     except LookupError:
+        logger.info("Tải các gói tokenizer NLTK (punkt, punkt_tab)")
         print("   -> 📖 Đang tải các gói tokenizer cần thiết cho NLTK ('punkt', 'punkt_tab')...")
         nltk.download('punkt', quiet=True)
         nltk.download('punkt_tab', quiet=True)
+        logger.info("Tải tokenizer hoàn tất")
         print("   -> ✅ Tải tokenizer hoàn tất.")
 
 def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap_sentences: int = 2):
@@ -90,44 +99,56 @@ def populate_database():
     tạo embedding, và lưu vào Milvus.
     """
     download_nltk_punkt() # Đảm bảo NLTK đã sẵn sàng
+    logger.info("=== BẮT ĐẦU QUÁ TRÌNH ĐỒNG BỘ DỮ LIỆU VÀO MILVUS ===")
     print("--- BẮT ĐẦU QUÁ TRÌNH ĐỒNG BỘ DỮ LIỆU VÀO MILVUS ---")
 
     # --- Bước 1: Đảm bảo file Markdown tồn tại ---
+    logger.info("Bước 1: Chuẩn bị file Markdown nguồn")
     print("\n--- Bước 1: Chuẩn bị file Markdown nguồn ---")
     md_filename = os.path.splitext(os.path.basename(PDF_PATH))[0] + ".md"
     md_filepath = os.path.join(os.path.dirname(PDF_PATH), md_filename)
 
     if not os.path.exists(md_filepath):
+        logger.warning(f"File '{md_filename}' không tồn tại, tạo mới từ PDF")
         print(f"   -> ⚠️ File '{md_filename}' không tồn tại. Tự động tạo mới từ PDF...")
         markdown_content = convert_to_markdown(PDF_PATH)
         try:
             with open(md_filepath, "w", encoding="utf-8") as f:
                 f.write(markdown_content)
+            logger.info(f"Đã tạo và lưu file '{md_filename}' thành công")
             print(f"   -> ✅ Đã tạo và lưu file '{md_filename}' thành công.")
         except Exception as e:
+            logger.error(f"Lỗi khi lưu file Markdown: {e}")
             print(f"   -> ❌ Lỗi khi lưu file Markdown: {e}")
             return
     else:
+        logger.info(f"Đã tìm thấy file '{md_filename}'")
         print(f"   -> ✅ Đã tìm thấy file '{md_filename}'.")
 
     # --- Bước 2: Đọc và xử lý file Markdown ---
+    logger.info(f"Bước 2: Đọc file {md_filename}")
     print(f"\n--- Bước 2: Đọc và xử lý file: {md_filename} ---")
     try:
         with open(md_filepath, "r", encoding="utf-8") as f:
             full_content = f.read()
+        logger.info(f"Đọc file thành công ({len(full_content)} ký tự)")
     except Exception as e:
+        logger.error(f"Lỗi khi đọc file Markdown: {e}")
         print(f"   -> ❌ Lỗi khi đọc file Markdown: {e}")
         return
 
     # --- Bước 3: Khởi tạo các thành phần cần thiết ---
     model = get_embedding_model()
     if not model:
+        logger.error("Không thể tải model embedding")
         return
 
+    logger.info(f"Bước 3: Chuẩn bị collection '{COLLECTION_NAME}' trên Milvus")
     print("\n--- Bước 3: Chuẩn bị collection trên Milvus ---")
     collection = get_or_create_collection(COLLECTION_NAME, dim=EMBEDDING_DIM, recreate=True)
 
     # --- Bước 4: Phân tách nội dung và tạo chunks ---
+    logger.info("Bước 4: Phân tách nội dung và tạo chunks")
     print("\n--- Bước 4: Phân tách nội dung và tạo chunks ---")
     all_chunks = []
     metadata = []
@@ -140,6 +161,7 @@ def populate_database():
     content_parts = page_splits[1:]
     
     if not content_parts:
+        logger.warning("Không tìm thấy marker trang trong MD, coi toàn bộ file là 1 trang")
         print("   -> ⚠️ Không tìm thấy marker trang nào trong file MD. Coi toàn bộ file là một trang.")
         page_chunks = chunk_text(full_content)
         all_chunks.extend(page_chunks)
@@ -163,20 +185,26 @@ def populate_database():
                     "pdf_source": os.path.basename(PDF_PATH),
                     "page": page_num
                 })
+        logger.info(f"Xử lý được {len(set(m['page'] for m in metadata))} trang")
         print(f"   -> Đã xử lý và phân tách được {len(set(m['page'] for m in metadata))} trang.")
 
     if not all_chunks:
+        logger.error("Không tìm thấy đoạn văn bản nào để xử lý")
         print("❌ Không tìm thấy đoạn văn bản nào để xử lý.")
         return
-        
+    
+    logger.info(f"Tổng cộng có {len(all_chunks)} chunks cần xử lý")
     print(f"   -> Tổng cộng có {len(all_chunks)} đoạn văn bản cần xử lý.")
 
     # --- Bước 5: Tạo embedding cho tất cả các chunks ---
+    logger.info("Bước 5: Tạo embeddings cho các đoạn văn bản")
     print("\n--- Bước 5: Tạo embeddings cho các đoạn văn bản ---")
     embeddings = model.encode(all_chunks, show_progress_bar=True)
+    logger.info("Tạo embedding hoàn tất")
     print("   -> ✅ Tạo embedding hoàn tất.")
 
     # --- Bước 6: Chuẩn bị và lưu dữ liệu vào Milvus ---
+    logger.info("Bước 6: Lưu dữ liệu vào Milvus")
     print("\n--- Bước 6: Lưu dữ liệu vào Milvus ---")
     entities = [
         embeddings,
@@ -187,15 +215,20 @@ def populate_database():
     
     try:
         insert_result = collection.insert(entities)
+        logger.info(f"Chèn thành công {insert_result.insert_count} vectors vào Milvus")
         print(f"   -> ✅ Chèn thành công {insert_result.insert_count} vectors vào Milvus.")
         
+        logger.info("Đang flush collection")
         print("   -> Đang flush collection...")
         collection.flush()
+        logger.info("Flush hoàn tất")
         print("   -> ✅ Flush hoàn tất.")
 
     except Exception as e:
+        logger.error(f"Lỗi khi chèn dữ liệu vào Milvus: {e}")
         print(f"   -> ❌ Lỗi khi chèn dữ liệu vào Milvus: {e}")
 
+    logger.info("=== QUÁ TRÌNH ĐỒNG BỘ HOÀN TẤT ===")
     print("\n--- QUÁ TRÌNH ĐỒNG BỘ HOÀN TẤT ---")
 
 

@@ -1,5 +1,8 @@
 import os
 from read_pdf import extract_pdf_pages
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 def format_table_as_markdown(table: list[list[str]]) -> str:
     """
@@ -29,13 +32,16 @@ def convert_to_markdown(pdf_path: str) -> str:
     thành một file Markdown hoàn chỉnh, xử lý đúng theo nguồn dữ liệu.
     """
     if not os.path.exists(pdf_path):
+        logger.error(f"Không tìm thấy file PDF: {pdf_path}")
         return f"# Lỗi\n\nKhông tìm thấy file PDF tại đường dẫn: `{pdf_path}`"
 
+    logger.info(f"Bắt đầu tạo file Markdown cho: {pdf_path}")
     print(f"▶️  Bắt đầu quá trình tạo file Markdown cho: {pdf_path}")
     try:
         pages_data = extract_pdf_pages(pdf_path)
         
         if not pages_data:
+            logger.warning(f"Không thể trích xuất nội dung từ {pdf_path}")
             return f"# Lỗi\n\nKhông thể trích xuất bất kỳ nội dung nào từ file: `{pdf_path}`"
 
         markdown_content = f"# Nội dung từ {os.path.basename(pdf_path)}\n\n"
@@ -64,10 +70,12 @@ def convert_to_markdown(pdf_path: str) -> str:
                         markdown_content += f"**Bảng {j}**\n"
                         markdown_content += format_table_as_markdown(table)
 
+        logger.info("Ghép nối nội dung Markdown hoàn tất")
         print("(´｡• ᵕ •｡`) Ghép nối nội dung Markdown hoàn tất.")
         return markdown_content
 
     except Exception as e:
+        logger.error(f"Lỗi trong quá trình tạo Markdown: {e}")
         return f"# Lỗi\n\nĐã có lỗi xảy ra trong quá trình tạo Markdown: {e}"
 
 if __name__ == "__main__":
@@ -78,8 +86,10 @@ if __name__ == "__main__":
     output_filename = os.path.splitext(os.path.basename(PDF_PATH))[0] + ".md"
     output_filepath = os.path.join(os.path.dirname(PDF_PATH), output_filename)
 
+    logger.info(f"Lưu kết quả vào file: {output_filepath}")
     print(f"（*＾3＾)/~☆ Lưu kết quả vào file: {output_filepath}")
     with open(output_filepath, "w", encoding="utf-8") as f:
         f.write(markdown_output)
-        
+    
+    logger.info("Hoàn thành tạo file Markdown")
     print("*    ~    o(≧▽≦)o    ♪ Hoàn thành! File Markdown đã được tạo.")

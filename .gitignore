@@ -6,6 +6,11 @@ __pycache__/
 *.pyo
 *.pyd
 *.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
 
 # Virtual environments
 venv/
@@ -27,17 +32,90 @@ models/
 
 # Logs
 *.log
+logs/
 
+# ==================
+# Testing & Coverage
+# ==================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
+.cache/
+nosetests.xml
+coverage.xml
+
+# ==================
+# IDE
+# ==================
 # VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+
+# Other IDEs
+*.swp
+*.swo
+*~
+
+# ==================
+# OS
+# ==================
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# ==================
+# Project Specific
+# ==================
+# PDFs (except sample/test PDFs if needed)
+*.pdf
+!sample.pdf
+!test.pdf
+
+# Markdown exports (generated files)
+*.md
+!README.md
+!TESTING.md
+!IMPROVEMENTS.md
+!CONTRIBUTING.md
 
 # where to load file test
 pdf_place/
 
+# Temporary query scripts
 gemini_query.py
 
+# Gradio cache
 .gradio/
 
+# Certificates
 ca.pem
 certificate.pem
+*.pem
 
+# Environment variables
 .env
+.env.local
+.env.*.local
+
+# Milvus data (if running locally)
+milvus_data/
+volumes/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

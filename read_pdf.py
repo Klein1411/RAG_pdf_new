@@ -10,8 +10,10 @@ import easyocr
 
 # Import class GeminiClient
 from gemini_client import GeminiClient
+from logging_config import get_logger
 
 # --- SETUP ---
+logger = get_logger(__name__)
 logging.getLogger("pdfplumber").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -47,12 +49,12 @@ Bây giờ, hãy bắt đầu xử lý các trang sau:
     prompt_parts.extend(images)
 
     try:
-        print(f"   -> 🧠 Đang gửi {len(images)} trang đến Gemini...")
+        logger.info(f"🧠 Đang gửi {len(images)} trang đến Gemini...")
         # generate_content của GeminiClient đã tự động trả về text
         response_text = gemini_client.generate_content(prompt_parts)
         return response_text
     except Exception as e:
-        print(f"      -> ❌ Lỗi khi gọi Gemini Vision cho toàn bộ PDF: {e}")
+        logger.error(f"❌ Lỗi khi gọi Gemini Vision cho toàn bộ PDF: {e}")
         return "[Lỗi Gemini: Không thể phân tích PDF]"
 
 # --- PHƯƠNG ÁN DỰ PHÒNG: OCR ---
@@ -61,12 +63,12 @@ def get_ocr_reader():
     global _ocr_reader
     if _ocr_reader is None:
         try:
-            print("🔎 Khởi tạo trình đọc OCR (phương án dự phòng)...")
+            logger.info("🔎 Khởi tạo trình đọc OCR (phương án dự phòng)...")
             use_gpu = torch.cuda.is_available()
-            print(f"   -> EasyOCR sẽ sử dụng {'GPU' if use_gpu else 'CPU'}.")
+            logger.info(f"EasyOCR sẽ sử dụng {'GPU' if use_gpu else 'CPU'}")
             _ocr_reader = easyocr.Reader(['vi', 'en'], gpu=use_gpu)
         except Exception as e:
-            print(f"   -> Lỗi nghiêm trọng khi khởi tạo EasyOCR: {e}")
+            logger.error(f"Lỗi nghiêm trọng khi khởi tạo EasyOCR: {e}")
             return None
     return _ocr_reader
 
@@ -88,33 +90,34 @@ def gemini_ocr_on_page(page, vision_client: GeminiClient) -> str:
     if not vision_client:
         return "[Lỗi Gemini: Vision client chưa được cấu hình]"
     try:
-        print("      -> 🧠 Gửi trang đến Gemini Vision để OCR...")
+        logger.debug("🧠 Gửi trang đến Gemini Vision để OCR...")
         img = page.to_image(resolution=300).original
         response_text = vision_client.generate_content(["Trích xuất toàn bộ văn bản từ hình ảnh này.", img])
         return response_text
     except Exception as e:
-        print(f"      -> ❌ Lỗi khi gọi Gemini Vision cho trang: {e}")
+        logger.error(f"❌ Lỗi khi gọi Gemini Vision cho trang: {e}")
         return "[Lỗi Gemini: Không thể OCR trang]"
 
 # --- HÀM TRÍCH XUẤT CHÍNH (Logic kết hợp) ---
 def extract_pdf_pages(path: str) -> List[Dict]:
-    print("✨ Cấu hình Gemini...")
+    logger.info("✨ Cấu hình Gemini...")
     gemini_client = None
     vision_client = None
     
     try:
-        # Khởi tạo client cho text generation
-        gemini_client = GeminiClient(model_name="gemini-2.0-flash-exp")
-        print("   -> ✅ Gemini text client đã sẵn sàng.")
+        # Khởi tạo client - sẽ tự động sử dụng danh sách model từ config.py
+        # Model mặc định: gemini-2.0-flash-exp → gemini-1.5-flash → gemini-1.5-flash-8b
+        gemini_client = GeminiClient()
+        logger.info("✅ Gemini text client đã sẵn sàng với model fallback")
     except Exception as e:
-        print(f"   -> ⚠️ Không thể cấu hình Gemini: {e}. Sẽ tự động dùng phương án 2.")
+        logger.warning(f"⚠️ Không thể cấu hình Gemini: {e}. Sẽ tự động dùng phương án 2")
     
     try:
         # Khởi tạo client cho vision tasks (có thể dùng cùng model hoặc model khác)
-        vision_client = GeminiClient(model_name="gemini-2.0-flash-exp")
-        print("   -> ✅ Gemini vision client đã sẵn sàng.")
+        vision_client = GeminiClient()
+        logger.info("✅ Gemini vision client đã sẵn sàng với model fallback")
     except Exception as e:
-        print(f"   -> ⚠️ Không thể cấu hình Gemini Vision: {e}. OCR bằng Gemini sẽ không khả dụng.")
+        logger.warning(f"⚠️ Không thể cấu hình Gemini Vision: {e}. OCR bằng Gemini sẽ không khả dụng")
 
     # --- Hỏi người dùng lựa chọn phương án ---
     use_gemini = False
@@ -135,7 +138,7 @@ def extract_pdf_pages(path: str) -> List[Dict]:
     with pdfplumber.open(path) as pdf:
         # --- PHƯƠNG ÁN 1: DÙNG GEMINI (BULK) ---
         if use_gemini and gemini_client:
-            print(f"(｡◕‿◕｡) Đang chuẩn bị hình ảnh từ {len(pdf.pages)} trang cho Gemini...")
+            logger.info(f"Đang chuẩn bị hình ảnh từ {len(pdf.pages)} trang cho Gemini...")
             all_page_images = [page.to_image(resolution=300).original for page in pdf.pages]
             
             # Gọi hàm mới để xử lý tất cả ảnh cùng lúc
@@ -143,10 +146,10 @@ def extract_pdf_pages(path: str) -> List[Dict]:
 
             # Nếu Gemini gặp lỗi, chuyển sang phương án 2
             if "[Lỗi Gemini" in full_pdf_description:
-                print("   -> (╥_╥) Gemini gặp lỗi khi xử lý hàng loạt, chuyển sang phương án 2: Phân tích thủ công...")
+                logger.warning("Gemini gặp lỗi khi xử lý hàng loạt, chuyển sang phương án 2: Phân tích thủ công...")
                 use_gemini = False # Đặt lại cờ để chạy logic fallback
             else:
-                print("   -> (*≧ω≦*) Gemini phân tích toàn bộ PDF thành công! Đang xử lý kết quả...")
+                logger.info("Gemini phân tích toàn bộ PDF thành công! Đang xử lý kết quả...")
                 # Tách kết quả trả về thành từng trang
                 page_contents = full_pdf_description.split("--- PAGE ")
                 
@@ -167,20 +170,20 @@ def extract_pdf_pages(path: str) -> List[Dict]:
                             "source": "gemini" # Đổi lại thành "gemini" để tương thích
                         })
                     except ValueError:
-                        print(f"   -> ⚠️ Không thể phân tích nội dung trả về cho một trang: {page_content[:100]}...")
+                        logger.warning(f"⚠️ Không thể phân tích nội dung trả về cho một trang: {page_content[:100]}...")
                         continue
                 
                 # Sắp xếp lại các trang để đảm bảo đúng thứ tự
                 pages.sort(key=lambda p: p['page_number'])
-                print(f"   -> ✅ Đã xử lý và lưu lại {len(pages)} trang từ kết quả của Gemini.")
+                logger.info(f"✅ Đã xử lý và lưu lại {len(pages)} trang từ kết quả của Gemini")
                 return pages # Trả về kết quả và kết thúc sớm
 
         # --- PHƯƠNG ÁN 2: THỦ CÔNG / OCR (FALLBACK) ---
         # Logic này sẽ chạy nếu người dùng không chọn Gemini ban đầu,
         # hoặc nếu Gemini gặp lỗi ở bước trên.
-        print("(｡◕‿◕｡) Đang phân tích từng trang theo phương án 2 (Thủ công/OCR)...")
+        logger.info("Đang phân tích từng trang theo phương án 2 (Thủ công/OCR)...")
         for i, page in enumerate(pdf.pages, 1):
-            print(f"   -> Đang xử lý trang {i}/{len(pdf.pages)}...")
+            logger.debug(f"Đang xử lý trang {i}/{len(pdf.pages)}...")
             page_data = {"page_number": i, "text": "", "tables": [], "source": "manual"}
             
             text = page.extract_text(layout=True) or ""
@@ -193,7 +196,7 @@ def extract_pdf_pages(path: str) -> List[Dict]:
                     page_data["text"] = gemini_ocr_on_page(page, vision_client)
                     page_data["source"] = "gemini-ocr"
                 else:
-                    print(f"      -> Trang {i} có ít văn bản, đang chạy OCR (EasyOCR)...")
+                    logger.info(f"Trang {i} có ít văn bản, đang chạy OCR (EasyOCR)...")
                     page_data["text"] = ocr_on_page(page)
                     page_data["source"] = "ocr"
             else:
@@ -208,24 +211,24 @@ def extract_pdf_pages(path: str) -> List[Dict]:
 def main():
     from config import PDF_PATH
     if not os.path.exists(PDF_PATH):
-        print(f"Lỗi: Không tìm thấy file PDF tại đường dẫn trong config.py: `{PDF_PATH}`")
+        logger.error(f"Không tìm thấy file PDF tại đường dẫn trong config.py: `{PDF_PATH}`")
         return
     
     try:
-        print(f"🚀 Bắt đầu xử lý file: {PDF_PATH}...")
+        logger.info(f"🚀 Bắt đầu xử lý file: {PDF_PATH}...")
         extracted_pages = extract_pdf_pages(PDF_PATH)
-        print(f"\n✅ Hoàn thành! Trích xuất được {len(extracted_pages)} trang.\n")
+        logger.info(f"✅ Hoàn thành! Trích xuất được {len(extracted_pages)} trang")
         
         if extracted_pages:
             p1 = extracted_pages[0]
-            print("--- PREVIEW TRANG 1 ---")
+            print("\n--- PREVIEW TRANG 1 ---")  # Giữ print cho output
             print(f"Nguồn: {p1['source']}")
             print(f"Nội dung: {p1['text'][:500]}...")
             if p1['tables']:
                 print(f"Tìm thấy {len(p1['tables'])} bảng.")
             
     except Exception as e:
-        print(f"\nĐã xảy ra lỗi không mong muốn: {e}")
+        logger.error(f"Đã xảy ra lỗi không mong muốn: {e}", exc_info=True)
 
 if __name__ == "__main__":
     main()
