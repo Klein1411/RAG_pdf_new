@@ -30,3 +30,6 @@ OLLAMA_API_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODELS = [
     "llama3:latest"
 ]
+
+# --- CẤU HÌNH CHO GEMINI ---
+GEMINI_INPUT_TOKEN_LIMIT = 100000 # Giới hạn token an toàn cho prompt gửi đến Gemini

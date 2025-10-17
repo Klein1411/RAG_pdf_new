@@ -2,10 +2,10 @@
 
 import time
 import requests
-import json
 
-from gemini_client import configure_gemini
-from config import OLLAMA_API_URL, OLLAMA_MODELS
+# Sử dụng GeminiClient mới, một class quản lý stateful
+from gemini_client import GeminiClient
+from config import OLLAMA_API_URL, OLLAMA_MODELS, GEMINI_INPUT_TOKEN_LIMIT
 
 # --- CẤU HÌNH ---
 MAX_RETRIES = 3
@@ -31,68 +31,67 @@ def call_ollama(prompt: str, model_name: str) -> str:
     except requests.exceptions.ConnectionError as e:
         raise ConnectionError(f"Không thể kết nối đến Ollama tại {OLLAMA_API_URL}. Bạn đã bật Ollama chưa?") from e
     except requests.exceptions.RequestException as e:
-        # Bắt lỗi 404 và cung cấp thông báo cụ thể hơn
         if e.response and e.response.status_code == 404:
             raise FileNotFoundError(f"Lỗi 404: Endpoint '{OLLAMA_API_URL}' không tồn tại. URL trong config.py có thể sai.") from e
         raise IOError(f"Lỗi khi gọi Ollama API: {e}") from e
 
-def call_gemini(prompt: str, model) -> str:
+def call_gemini(prompt: str, gemini_client: GeminiClient) -> str:
     """
-    Gửi yêu cầu đến Gemini API. Ném ra Exception nếu có lỗi.
+    Gửi yêu cầu đến Gemini API thông qua GeminiClient.
+    Client sẽ tự động quản lý xoay vòng key.
     """
-    if not model:
-        raise ValueError("Model Gemini chưa được cấu hình.")
-    print("   -> 💬 Đang gửi yêu cầu đến Gemini...")
+    if not gemini_client:
+        raise ValueError("Gemini client chưa được khởi tạo.")
+
+    # Kiểm tra token chủ động
     try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        print(f"   -> ℹ️ Đang đếm token cho prompt...")
+        token_count = gemini_client.count_tokens(prompt).total_tokens
+        print(f"   -> ℹ️ Ước tính prompt có {token_count} tokens.")
+        if token_count > GEMINI_INPUT_TOKEN_LIMIT:
+            raise ValueError(f"Prompt quá lớn ({token_count} tokens), vượt ngưỡng an toàn {GEMINI_INPUT_TOKEN_LIMIT} tokens.")
     except Exception as e:
-        raise IOError(f"Lỗi khi gọi Gemini API: {e}") from e
+        raise e
+
+    # generate_content của client đã bao gồm logic xoay vòng key
+    return gemini_client.generate_content(prompt)
 
 # --- HÀM LOGIC CHÍNH (RETRY & FALLBACK) ---
 
-def generate_answer_with_fallback(prompt, model_choice, gemini_model, ollama_model_name):
+def generate_answer_with_fallback(prompt, model_choice, gemini_client, ollama_model_name):
     """
-    Hàm chính để sinh câu trả lời, bao gồm logic retry và fallback.
+    Hàm chính để sinh câu trả lời, với logic fallback đã được cập nhật.
     """
     primary_func, primary_name, fallback_func, fallback_name = (None, None, None, None)
+    answer = None
 
     if model_choice == '1':
-        primary_func = lambda: call_gemini(prompt, gemini_model)
+        primary_func = lambda: call_gemini(prompt, gemini_client)
         primary_name = "Gemini"
         fallback_func = lambda: call_ollama(prompt, ollama_model_name)
         fallback_name = "Ollama"
     else:
         primary_func = lambda: call_ollama(prompt, ollama_model_name)
         primary_name = "Ollama"
-        fallback_func = lambda: call_gemini(prompt, gemini_model)
+        fallback_func = lambda: call_gemini(prompt, gemini_client)
         fallback_name = "Gemini"
 
     # --- Thử model chính ---
     print(f"\n▶️ Đang thử model chính: {primary_name}...")
-    for attempt in range(MAX_RETRIES):
-        try:
-            answer = primary_func()
-            return answer # Trả về nếu thành công
-        except Exception as e:
-            print(f"   -> ⚠️ Lần thử {attempt + 1}/{MAX_RETRIES} với {primary_name} thất bại: {e}")
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAY)
-            else:
-                print(f"   -> ❌ {primary_name} thất bại hoàn toàn.")
+    try:
+        answer = primary_func()
+        return answer
+    except Exception as e:
+        # Các lỗi như hết key, prompt quá lớn, connection error sẽ được bắt ở đây
+        print(f"   -> ⚠️ Model chính ({primary_name}) thất bại hoàn toàn: {e}")
 
     # --- Thử model dự phòng ---
     print(f"\n↪️ Chuyển sang model dự phòng: {fallback_name}...")
-    for attempt in range(MAX_RETRIES):
-        try:
-            answer = fallback_func()
-            return answer # Trả về nếu thành công
-        except Exception as e:
-            print(f"   -> ⚠️ Lần thử {attempt + 1}/{MAX_RETRIES} với {fallback_name} thất bại: {e}")
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAY)
-            else:
-                print(f"   -> ❌ {fallback_name} cũng thất bại.")
+    try:
+        answer = fallback_func()
+        return answer
+    except Exception as e:
+        print(f"   -> ❌ Model dự phòng ({fallback_name}) cũng thất bại: {e}")
 
     return "[LỖI HỆ THỐNG] Cả hai model chính và dự phòng đều không thể phản hồi."
 
@@ -102,14 +101,15 @@ def generate_answer_with_fallback(prompt, model_choice, gemini_model, ollama_mod
 def initialize_and_select_llm():
     """
     Xử lý việc cấu hình và lựa chọn model của người dùng.
-    Trả về: (model_choice, gemini_model, ollama_model_name)
+    Trả về: (model_choice, gemini_client, ollama_model_name)
     """
     print("\n✨ Đang cấu hình các model sinh câu trả lời...")
-    gemini_model = configure_gemini()
-    if gemini_model:
-        print("   -> ✅ Gemini đã sẵn sàng.")
-    else:
-        print("   -> ⚠️ Không thể cấu hình Gemini. Nó sẽ không khả dụng.")
+    gemini_client = None
+    try:
+        gemini_client = GeminiClient()
+        print("   -> ✅ Gemini đã sẵn sàng (với trình quản lý API key).")
+    except Exception as e:
+        print(f"   -> ⚠️ Không thể khởi tạo Gemini Client: {e}. Nó sẽ không khả dụng.")
 
     ollama_model_name = ""
     model_choice = ""
@@ -120,9 +120,9 @@ def initialize_and_select_llm():
         model_choice = input(prompt_text).strip()
         
         if model_choice == '1':
-            if gemini_model:
+            if gemini_client:
                 print("   -> ✅ Model chính là Gemini.")
-                return model_choice, gemini_model, ollama_model_name
+                return model_choice, gemini_client, ollama_model_name
             else:
                 print("   -> ❌ Gemini chưa được cấu hình, vui lòng chọn Ollama.")
         elif model_choice == '2':
@@ -151,6 +151,6 @@ def initialize_and_select_llm():
                     print("      -> Vui lòng nhập một số.")
             
             print(f"   -> ✅ Model chính là '{ollama_model_name}' từ Ollama.")
-            return model_choice, gemini_model, ollama_model_name
+            return model_choice, gemini_client, ollama_model_name
         else:
             print("   -> Lựa chọn không hợp lệ. Vui lòng nhập 1 hoặc 2.")

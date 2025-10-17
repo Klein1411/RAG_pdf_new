@@ -2,94 +2,87 @@ import os
 import dotenv
 import google.generativeai as genai
 
-# Tải các biến môi trường
-dotenv.load_dotenv()
-
-# Lấy danh sách API keys từ .env
-API_KEYS = [key for key in [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 4)] if key]
-
-# Danh sách các model để thử
-GENERATIVE_MODELS = ["gemini-2.5-flash",
-                     "gemini-2.0-flash",
-                     "gemini-1.5-flash"]
-
-def configure_gemini():
+class GeminiClient:
     """
-    Tự động tìm và cấu hình API key và model generative tốt nhất hoạt động.
-    Trả về model đã được khởi tạo nếu thành công, ngược lại trả về None.
-    """
-    if not API_KEYS:
-        print("⚠️ Không tìm thấy API key nào trong file .env.")
-        return None
+    Một trình quản lý stateful cho API của Google Gemini.
 
-    print("🔄 Đang tìm API key và model phù hợp...")
-    for i, key in enumerate(API_KEYS):
-        print(f"🔑 Thử với API Key #{i + 1}...")
-        genai.configure(api_key=key)
+    Class này sẽ quản lý một danh sách các API key và tự động xoay vòng
+    qua các key khi gặp lỗi có thể thử lại (ví dụ: lỗi quota).
+    """
+    def __init__(self, model_name: str = "gemini-2.5-flash"):
+        dotenv.load_dotenv()
+        self.api_keys = [key for key in [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 10)] if key]
+        if not self.api_keys:
+            raise ValueError("Không tìm thấy biến môi trường GEMINI_API_KEY nào trong file .env")
+
+        self.current_key_index = 0
+        self.model_name = model_name # Sử dụng model_name được truyền vào
+        self._configure_client()
+
+    def _configure_client(self):
+        """Cấu hình client genai với key hiện tại."""
+        if self.current_key_index >= len(self.api_keys):
+            return False # Đã hết key để thử
         
-        # Thử với các model generative
-        for model_name in GENERATIVE_MODELS:
-            try:
-                model = genai.GenerativeModel(model_name)
-                model.generate_content("test")
-                print(f"   -> ✅ Key #{i + 1} và model '{model_name}' đã sẵn sàng.")
-                # Trả về model đầu tiên hoạt động
-                return model
-            except Exception as e:
-                # In lỗi ra để người dùng biết chi tiết
-                # print(f"   -> ❌ Lỗi với model '{model_name}': {e}")
-                # Chỉ thông báo model không hoạt động cho gọn
-                print(f"   -> ❌ Model '{model_name}' không hoạt động với key này.")
-                continue # Thử model tiếp theo
-    
-    print("❌ Không tìm thấy API key hoặc model nào hoạt động.")
-    return None
+        current_key = self.api_keys[self.current_key_index]
+        print(f"🔑 Đang cấu hình Gemini với API Key #{self.current_key_index + 1}")
+        genai.configure(api_key=current_key)
+        self.model = genai.GenerativeModel(self.model_name)
+        return True
 
+    def _switch_to_next_key(self) -> bool:
+        """
+        Chuyển sang API key tiếp theo và cấu hình lại client.
+        Trả về True nếu chuyển thành công, False nếu đã hết key.
+        """
+        self.current_key_index += 1
+        if self.current_key_index < len(self.api_keys):
+            self._configure_client()
+            return True
+        else:
+            print("   -> ❌ Đã thử hết tất cả các API key của Gemini.")
+            return False
 
-# Danh sách các model vision để thử
-VISION_MODELS = ["gemini-2.5-flash"]
-
-def configure_gemini_vision():
-    """
-    Tự động tìm và cấu hình API key và model vision tốt nhất hoạt động.
-    Trả về model đã được khởi tạo nếu thành công, ngược lại trả về None.
-    """
-    if not API_KEYS:
-        print("⚠️ Không tìm thấy API key nào trong file .env.")
-        return None
-
-    print("🔄 Đang tìm API key và model vision phù hợp...")
-    for i, key in enumerate(API_KEYS):
-        print(f"🔑 Thử với API Key #{i + 1}...")
-        genai.configure(api_key=key)
+    def generate_content(self, prompt, return_full_response: bool = False):
+        """
+        Tạo nội dung và tự động xử lý việc xoay vòng key khi gặp lỗi.
         
-        # Thử với các model vision
-        for model_name in VISION_MODELS:
+        Args:
+            prompt: Có thể là string (text prompt) hoặc list (cho vision tasks với ảnh)
+            return_full_response: Nếu True, trả về response object; nếu False, chỉ trả về text
+        
+        Returns:
+            str hoặc response object tùy thuộc vào return_full_response
+        """
+        while self.current_key_index < len(self.api_keys):
             try:
-                model = genai.GenerativeModel(model_name)
-                # Here we just check if model can be initialized
-                model.generate_content("test") # Test with a simple prompt
-                print(f"   -> ✅ Key #{i + 1} và model vision '{model_name}' đã sẵn sàng.")
-                return model
+                # Thử tạo nội dung với key hiện tại
+                response = self.model.generate_content(prompt)
+                
+                if return_full_response:
+                    return response
+                else:
+                    return response.text.strip()
+                    
             except Exception as e:
-                print(f"   -> ❌ Lỗi với model vision '{model_name}': {e}")
-                continue # Thử model tiếp theo
-    
-    print("❌ Không tìm thấy API key hoặc model vision nào hoạt động.")
-    return None
+                error_str = str(e).lower()
+                # Nếu là lỗi quota hoặc key không hợp lệ, chuyển sang key tiếp theo
+                if "429" in error_str and "quota" in error_str:
+                    print(f"   -> ⚠️ Key #{self.current_key_index + 1} đã hết quota. Đang chuyển key...")
+                    if not self._switch_to_next_key():
+                        # Nếu không còn key nào, ném ra lỗi cuối cùng
+                        raise ConnectionError("Tất cả các API key của Gemini đều đã hết quota.")
+                elif "api key not valid" in error_str:
+                    print(f"   -> ⚠️ Key #{self.current_key_index + 1} không hợp lệ. Đang chuyển key...")
+                    if not self._switch_to_next_key():
+                        raise ConnectionError("Tất cả các API key của Gemini đều không hợp lệ.")
+                else:
+                    # Nếu là lỗi khác (ví dụ: lỗi nội dung không an toàn), ném ra ngay
+                    raise e
+        
+        # Nếu vòng lặp kết thúc mà không thành công, nghĩa là đã hết key
+        raise ConnectionError("Tất cả các API key của Gemini đều đã được thử và thất bại.")
 
-if __name__ == "__main__":
-    # Chạy cấu hình và kiểm tra
-    active_model = configure_gemini()
-    
-    if active_model:
-        print(f"\n✅ Cấu hình thành công! Model '{active_model.model_name}' đang được sử dụng.")
-    else:
-        print("\n❌ Không thể cấu hình Gemini. Vui lòng kiểm tra lại API keys và quyền truy cập.")
-
-    # Test for vision model
-    active_vision_model = configure_gemini_vision()
-    if active_vision_model:
-        print(f"\n✅ Cấu hình vision thành công! Model '{active_vision_model.model_name}' đang được sử dụng.")
-    else:
-        print("\n❌ Không thể cấu hình Gemini Vision.")
+    def count_tokens(self, prompt: str):
+        """Wrapper cho hàm count_tokens của model hiện tại."""
+        return self.model.count_tokens(prompt)

@@ -8,20 +8,20 @@ import numpy as np
 import torch
 import easyocr
 
-# Import hàm cấu hình Gemini từ client
-from gemini_client import configure_gemini, configure_gemini_vision
+# Import class GeminiClient
+from gemini_client import GeminiClient
 
 # --- SETUP ---
 logging.getLogger("pdfplumber").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # --- HÀM XỬ LÝ VỚI GEMINI ---
-def describe_pdf_with_gemini(images: List[Image.Image], model) -> str:
+def describe_pdf_with_gemini(images: List[Image.Image], gemini_client: GeminiClient) -> str:
     """
     Gửi tất cả ảnh của các trang PDF đến Gemini trong một yêu cầu duy nhất.
     """
-    if not model:
-        return "[Lỗi Gemini: Model chưa được cấu hình]"
+    if not gemini_client:
+        return "[Lỗi Gemini: Client chưa được cấu hình]"
 
     # Xây dựng prompt với hướng dẫn chi tiết
     prompt_parts = [
@@ -48,8 +48,9 @@ Bây giờ, hãy bắt đầu xử lý các trang sau:
 
     try:
         print(f"   -> 🧠 Đang gửi {len(images)} trang đến Gemini...")
-        response = model.generate_content(prompt_parts)
-        return response.text.strip()
+        # generate_content của GeminiClient đã tự động trả về text
+        response_text = gemini_client.generate_content(prompt_parts)
+        return response_text
     except Exception as e:
         print(f"      -> ❌ Lỗi khi gọi Gemini Vision cho toàn bộ PDF: {e}")
         return "[Lỗi Gemini: Không thể phân tích PDF]"
@@ -80,17 +81,17 @@ def ocr_on_page(page) -> str:
     except Exception as e:
         return f"[Lỗi khi đang chạy OCR trên trang: {e}]"
 
-def gemini_ocr_on_page(page, model) -> str:
+def gemini_ocr_on_page(page, vision_client: GeminiClient) -> str:
     """
     Sử dụng Gemini Vision để OCR một trang duy nhất.
     """
-    if not model:
-        return "[Lỗi Gemini: Model Vision chưa được cấu hình]"
+    if not vision_client:
+        return "[Lỗi Gemini: Vision client chưa được cấu hình]"
     try:
         print("      -> 🧠 Gửi trang đến Gemini Vision để OCR...")
         img = page.to_image(resolution=300).original
-        response = model.generate_content(["Trích xuất toàn bộ văn bản từ hình ảnh này.", img])
-        return response.text.strip()
+        response_text = vision_client.generate_content(["Trích xuất toàn bộ văn bản từ hình ảnh này.", img])
+        return response_text
     except Exception as e:
         print(f"      -> ❌ Lỗi khi gọi Gemini Vision cho trang: {e}")
         return "[Lỗi Gemini: Không thể OCR trang]"
@@ -98,16 +99,26 @@ def gemini_ocr_on_page(page, model) -> str:
 # --- HÀM TRÍCH XUẤT CHÍNH (Logic kết hợp) ---
 def extract_pdf_pages(path: str) -> List[Dict]:
     print("✨ Cấu hình Gemini...")
-    model = configure_gemini()
-    vision_model = configure_gemini_vision()
-    if not model:
-        print("   -> ⚠️ Không thể cấu hình Gemini. Sẽ tự động dùng phương án 2.")
-    if not vision_model:
-        print("   -> ⚠️ Không thể cấu hình Gemini Vision. OCR bằng Gemini sẽ không khả dụng.")
+    gemini_client = None
+    vision_client = None
+    
+    try:
+        # Khởi tạo client cho text generation
+        gemini_client = GeminiClient(model_name="gemini-2.0-flash-exp")
+        print("   -> ✅ Gemini text client đã sẵn sàng.")
+    except Exception as e:
+        print(f"   -> ⚠️ Không thể cấu hình Gemini: {e}. Sẽ tự động dùng phương án 2.")
+    
+    try:
+        # Khởi tạo client cho vision tasks (có thể dùng cùng model hoặc model khác)
+        vision_client = GeminiClient(model_name="gemini-2.0-flash-exp")
+        print("   -> ✅ Gemini vision client đã sẵn sàng.")
+    except Exception as e:
+        print(f"   -> ⚠️ Không thể cấu hình Gemini Vision: {e}. OCR bằng Gemini sẽ không khả dụng.")
 
     # --- Hỏi người dùng lựa chọn phương án ---
     use_gemini = False
-    if model: # Chỉ hỏi nếu Gemini có sẵn
+    if gemini_client: # Chỉ hỏi nếu Gemini có sẵn
         while True:
             choice = input("✨ Bạn có muốn sử dụng phương án 1 (Phân tích bằng Gemini Vision)? (Y/N): ").strip().upper()
             if choice in ['Y', 'N']:
@@ -123,12 +134,12 @@ def extract_pdf_pages(path: str) -> List[Dict]:
     pages = []
     with pdfplumber.open(path) as pdf:
         # --- PHƯƠNG ÁN 1: DÙNG GEMINI (BULK) ---
-        if use_gemini:
+        if use_gemini and gemini_client:
             print(f"(｡◕‿◕｡) Đang chuẩn bị hình ảnh từ {len(pdf.pages)} trang cho Gemini...")
             all_page_images = [page.to_image(resolution=300).original for page in pdf.pages]
             
             # Gọi hàm mới để xử lý tất cả ảnh cùng lúc
-            full_pdf_description = describe_pdf_with_gemini(all_page_images, model)
+            full_pdf_description = describe_pdf_with_gemini(all_page_images, gemini_client)
 
             # Nếu Gemini gặp lỗi, chuyển sang phương án 2
             if "[Lỗi Gemini" in full_pdf_description:
@@ -178,8 +189,8 @@ def extract_pdf_pages(path: str) -> List[Dict]:
             # Nếu trang có ít text và không có bảng -> khả năng là ảnh -> dùng OCR
             if len(text.strip()) < 100 and not tables:
                 # Ưu tiên dùng Gemini Vision nếu có
-                if vision_model:
-                    page_data["text"] = gemini_ocr_on_page(page, vision_model)
+                if vision_client:
+                    page_data["text"] = gemini_ocr_on_page(page, vision_client)
                     page_data["source"] = "gemini-ocr"
                 else:
                     print(f"      -> Trang {i} có ít văn bản, đang chạy OCR (EasyOCR)...")
