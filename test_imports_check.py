@@ -41,11 +41,11 @@ except Exception as e:
 # Test 4: Tools
 print("\n4. Testing tools...")
 try:
-    from agent.tools.search_tool import get_search_tool
-    print("   ✅ search_tool OK")
+    from agent.tools.search_tool_langchain import get_global_search_tool as get_search_tool
+    print("   ✅ search_tool_langchain OK")
 except Exception as e:
-    errors.append(f"search_tool: {e}")
-    print(f"   ❌ search_tool: {e}")
+    errors.append(f"search_tool_langchain: {e}")
+    print(f"   ❌ search_tool_langchain: {e}")
 
 try:
     from agent.tools.topic_tool import get_topic_tool

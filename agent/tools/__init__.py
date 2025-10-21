@@ -5,7 +5,7 @@ Agent Tools Package
 Các tools được trích xuất từ Agent để tái sử dụng
 """
 
-from .search_tool import SearchTool, get_search_tool
+from .search_tool_langchain import SearchTool, get_global_search_tool as get_search_tool
 from .topic_tool import TopicTool, get_topic_tool
 from .export_tool import ExportTool, get_export_tool
 

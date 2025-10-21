@@ -30,7 +30,7 @@ from agent.conversation_history import ConversationHistory
 from agent.intent_detector import IntentDetector
 
 # Import tools
-from agent.tools.search_tool import get_search_tool
+from agent.tools.search_tool_langchain import get_global_search_tool as get_search_tool
 from agent.tools.topic_tool import get_topic_tool
 from agent.tools.export_tool import get_export_tool
 from agent.tools.rag_tool import get_rag_tool
@@ -99,24 +99,18 @@ class Agent:
         """Khởi tạo LLM client nếu chưa có"""
         if self.llm_client is None:
             logger.info("Initializing LLM client...")
-            from src.llm_handler import initialize_and_select_llm
+            from src.llm_langchain import initialize_and_select_llm_langchain
             try:
-                # initialize_and_select_llm trả về (model_choice, gemini_client, ollama_model_name)
+                # initialize_and_select_llm_langchain trả về (model_choice, llm_manager)
                 # model_choice: "1" (Gemini) hoặc "2" (Ollama)
-                model_choice, gemini_client, ollama_model = initialize_and_select_llm()
+                model_choice, llm_manager = initialize_and_select_llm_langchain()
                 
-                if model_choice == '1':
-                    # Gemini
-                    self.llm_client = gemini_client
-                    self.llm_type = 'gemini'
-                elif model_choice == '2':
-                    # Ollama - cần import client
-                    from ollama import Client
-                    self.llm_client = Client()
-                    self.llm_type = 'ollama'
-                    self.ollama_model = ollama_model
-                else:
-                    raise ValueError(f"Unknown model choice: {model_choice}")
+                # Store LangChain LLM manager
+                self.llm_client = llm_manager
+                self.llm_type = llm_manager.provider  # 'gemini' or 'ollama'
+                
+                if llm_manager.provider == 'ollama':
+                    self.ollama_model = llm_manager.model_name
                 
                 logger.info(f"✅ LLM initialized: {self.llm_type}")
                 logger.debug(f"LLM client type: {type(self.llm_client)}")
@@ -132,10 +126,9 @@ class Agent:
             from sentence_transformers import SentenceTransformer
             from src.config import EMBEDDING_MODEL_NAME
             
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME).to(device)
-            self.search_tool = get_search_tool(embedding_model)
-            logger.info(f"✅ SearchTool initialized on {device}")
+            # SearchToolLangChain tự load embedding model internally
+            self.search_tool = get_search_tool()
+            logger.info(f"✅ SearchTool initialized")
     
     def _ensure_rag_tool_initialized(self):
         """Khởi tạo RagTool nếu chưa có"""
@@ -422,15 +415,8 @@ User: {message}
 
 Hãy trả lời ngắn gọn, tự nhiên và thân thiện."""
 
-            # Call LLM
-            if self.llm_type == 'gemini':
-                answer = self.llm_client.generate_content(prompt).strip()
-            else:  # ollama
-                response = self.llm_client.chat(
-                    model=self.ollama_model,
-                    messages=[{'role': 'user', 'content': prompt}]
-                )
-                answer = response['message']['content'].strip()
+            # Call LLM using LangChain interface
+            answer = self.llm_client.generate(prompt).strip()
             
             return answer
         

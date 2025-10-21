@@ -20,7 +20,7 @@ project_root = Path(__file__).parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from agent.tools.search_tool import SearchTool
+from agent.tools.search_tool_langchain import SearchTool
 from src.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -295,22 +295,10 @@ Instructions:
 Answer:"""
         
         try:
-            if self.llm_type == 'gemini':
-                # Gemini
-                answer = self.llm_client.generate_content(prompt)
-                return answer.strip() if answer else "Xin lỗi, không thể tạo câu trả lời."
-            
-            elif self.llm_type == 'ollama':
-                # Ollama
-                response = self.llm_client.chat(
-                    model=self.ollama_model,
-                    messages=[{'role': 'user', 'content': prompt}]
-                )
-                answer = response['message']['content'].strip()
-                return answer
-            
-            else:
-                return f"Unsupported LLM type: {self.llm_type}"
+            # Unified generation với LLMManager
+            # LLMManager.generate() hỗ trợ cả Gemini và Ollama
+            answer = self.llm_client.generate(prompt)
+            return answer.strip() if answer else "Xin lỗi, không thể tạo câu trả lời."
         
         except Exception as e:
             logger.error(f"LLM generation error: {e}")

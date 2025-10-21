@@ -25,6 +25,13 @@ EMBEDDING_DIM = 768
 # Tên collection trong Milvus để lưu trữ các vector.
 COLLECTION_NAME = "pdf_rag_collection"
 
+# --- CẤU HÌNH CHO CHUNKING ---
+# Kích thước chunk (ký tự) khi chia tài liệu
+CHUNK_SIZE = 1000
+
+# Số ký tự overlap giữa các chunk
+CHUNK_OVERLAP = 200
+
 # --- CẤU HÌNH CHO OLLAMA ---
 
 # URL của Ollama API endpoint
@@ -32,18 +39,21 @@ OLLAMA_API_URL = "http://localhost:11434/api/generate"
 
 # Danh sách các model Ollama để lựa chọn.
 # Model đầu tiên trong danh sách sẽ là lựa chọn mặc định.
-# Thêm các model khác vào đây, ví dụ: OLLAMA_MODELS = ["llama3:latest", "mistral:latest"]
+# Đảm bảo model đã được pull: ollama pull llama3:latest
 OLLAMA_MODELS = [
-    "llama3:latest"
+    "llama3:latest",   # Llama 3 (mới nhất, khuyên dùng)
+    "llama2",          # Llama 2 (cũ hơn)
+    "mistral:latest"   # Mistral (nhẹ, nhanh)
 ]
 
 # --- CẤU HÌNH CHO GEMINI ---
 # Danh sách các model Gemini theo thứ tự ưu tiên (model đầu tiên là chính, các model sau là dự phòng)
+# QUAN TRỌNG: Dùng format "models/..." để tương thích với google-generativeai library
 GEMINI_MODELS = [
-    "gemini-2.5-flash",      # Model chính - Gemini 2.5 Flash (mới nhất, mạnh nhất)
-    "gemini-2.0-flash-exp",  # Dự phòng 1 - Gemini 2.0 Flash (thử nghiệm)
-    "gemini-1.5-flash",      # Dự phòng 2 - Gemini 1.5 Flash (ổn định)
-    "gemini-1.5-flash-8b"    # Dự phòng 3 - Gemini 1.5 Flash 8B (nhẹ nhất)
+    "models/gemini-2.5-flash",     # Model mới nhất - Gemini 2.5 Flash (2025) ⚡
+    "models/gemini-2.0-flash",     # Dự phòng 1 - Gemini 2.0 Flash (2024)
+    "models/gemini-flash-latest",  # Dự phòng 2 - Alias cho model Flash mới nhất (stable)
+    "models/gemini-pro-latest"     # Dự phòng 3 - Alias cho model Pro mới nhất (fallback)
 ]
 
 GEMINI_INPUT_TOKEN_LIMIT = 1000000 # Giới hạn token an toàn cho prompt gửi đến Gemini (2.0 Flash hỗ trợ đến 1M tokens)

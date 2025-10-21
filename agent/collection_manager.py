@@ -406,7 +406,7 @@ class CollectionManager:
         
         try:
             # Import necessary modules
-            from src.populate_milvus import get_embedding_model, chunk_text
+            from src.ingest_langchain import get_embedding_model, chunk_text
             from pathlib import Path
             
             # Get collection
